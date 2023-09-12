@@ -1,36 +1,36 @@
 /*********************************************************************
-* Software License Agreement (BSD License)
-*
-*  Copyright (c) 2012, Willow Garage, Inc.
-*  All rights reserved.
-*
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
-*
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of Willow Garage nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
-*
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
-*********************************************************************/
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2012, Willow Garage, Inc.
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of Willow Garage nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 /* Author: Ioan Sucan */
 
@@ -42,7 +42,7 @@ namespace pick_place
 ManipulationPipeline::ManipulationPipeline(const std::string& name, unsigned int nthreads)
   : name_(name), nthreads_(nthreads), verbose_(false), stop_processing_(true)
 {
-  processing_threads_.resize(nthreads, NULL);
+  processing_threads_.resize(nthreads, nullptr);
 }
 
 ManipulationPipeline::~ManipulationPipeline()
@@ -61,8 +61,8 @@ const ManipulationStagePtr& ManipulationPipeline::getFirstStage() const
 {
   if (stages_.empty())
   {
-    static const ManipulationStagePtr empty;
-    return empty;
+    static const ManipulationStagePtr EMPTY;
+    return EMPTY;
   }
   else
     return stages_.front();
@@ -72,8 +72,8 @@ const ManipulationStagePtr& ManipulationPipeline::getLastStage() const
 {
   if (stages_.empty())
   {
-    static const ManipulationStagePtr empty;
-    return empty;
+    static const ManipulationStagePtr EMPTY;
+    return EMPTY;
   }
   else
     return stages_.back();
@@ -88,8 +88,8 @@ void ManipulationPipeline::reset()
 void ManipulationPipeline::setVerbose(bool flag)
 {
   verbose_ = flag;
-  for (std::size_t i = 0; i < stages_.size(); ++i)
-    stages_[i]->setVerbose(flag);
+  for (pick_place::ManipulationStagePtr& stage : stages_)
+    stage->setVerbose(flag);
 }
 
 void ManipulationPipeline::clear()
@@ -110,17 +110,17 @@ void ManipulationPipeline::start()
 {
   stop_processing_ = false;
   empty_queue_threads_ = 0;
-  for (std::size_t i = 0; i < stages_.size(); ++i)
-    stages_[i]->resetStopSignal();
+  for (pick_place::ManipulationStagePtr& stage : stages_)
+    stage->resetStopSignal();
   for (std::size_t i = 0; i < processing_threads_.size(); ++i)
     if (!processing_threads_[i])
-      processing_threads_[i] = new boost::thread(boost::bind(&ManipulationPipeline::processingThread, this, i));
+      processing_threads_[i] = new boost::thread([this, i] { processingThread(i); });
 }
 
 void ManipulationPipeline::signalStop()
 {
-  for (std::size_t i = 0; i < stages_.size(); ++i)
-    stages_[i]->signalStop();
+  for (pick_place::ManipulationStagePtr& stage : stages_)
+    stage->signalStop();
   stop_processing_ = true;
   queue_access_cond_.notify_all();
 }
@@ -128,12 +128,12 @@ void ManipulationPipeline::signalStop()
 void ManipulationPipeline::stop()
 {
   signalStop();
-  for (std::size_t i = 0; i < processing_threads_.size(); ++i)
-    if (processing_threads_[i])
+  for (boost::thread*& processing_thread : processing_threads_)
+    if (processing_thread)
     {
-      processing_threads_[i]->join();
-      delete processing_threads_[i];
-      processing_threads_[i] = NULL;
+      processing_thread->join();
+      delete processing_thread;
+      processing_thread = nullptr;
     }
 }
 
@@ -173,7 +173,7 @@ void ManipulationPipeline::processingThread(unsigned int index)
         {
           bool res = stages_[i]->evaluate(g);
           g->processing_stage_ = i + 1;
-          if (res == false)
+          if (!res)
           {
             boost::mutex::scoped_lock slock(result_lock_);
             failed_.push_back(g);
@@ -209,8 +209,8 @@ void ManipulationPipeline::push(const ManipulationPlanPtr& plan)
 {
   boost::mutex::scoped_lock slock(queue_access_lock_);
   queue_.push_back(plan);
-  ROS_INFO_STREAM_NAMED("manipulation", "Added plan for pipeline '" << name_ << "'. Queue is now of size "
-                                                                    << queue_.size());
+  ROS_INFO_STREAM_NAMED("manipulation",
+                        "Added plan for pipeline '" << name_ << "'. Queue is now of size " << queue_.size());
   queue_access_cond_.notify_all();
 }
 
@@ -227,4 +227,4 @@ void ManipulationPipeline::reprocessLastFailure()
                                             << name_ << "'. Queue is now of size " << queue_.size());
   queue_access_cond_.notify_all();
 }
-}
+}  // namespace pick_place

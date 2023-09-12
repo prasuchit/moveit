@@ -43,8 +43,7 @@
 
 // Author: Blaise Gassend
 
-#ifndef __ompl_interface_ros__OMPLDYNAMICRECONFIGURECONFIG_H__
-#define __ompl_interface_ros__OMPLDYNAMICRECONFIGURECONFIG_H__
+#pragma once
 
 #include <dynamic_reconfigure/config_tools.h>
 #include <moveit/macros/class_forward.h>
@@ -63,7 +62,7 @@ class OMPLDynamicReconfigureConfigStatics;
 class OMPLDynamicReconfigureConfig
 {
 public:
-  MOVEIT_CLASS_FORWARD(AbstractParamDescription);
+  MOVEIT_CLASS_FORWARD(AbstractParamDescription);  // Defines AbstractParamDescriptionPtr, ConstPtr, WeakPtr... etc
   class AbstractParamDescription : public dynamic_reconfigure::ParamDescription
   {
   public:
@@ -142,7 +141,7 @@ public:
     }
   };
 
-  MOVEIT_CLASS_FORWARD(AbstractGroupDescription);
+  MOVEIT_CLASS_FORWARD(AbstractGroupDescription);  // Defines AbstractGroupDescriptionPtr, ConstPtr, WeakPtr... etc
   class AbstractGroupDescription : public dynamic_reconfigure::Group
   {
   public:
@@ -522,7 +521,7 @@ inline const OMPLDynamicReconfigureConfigStatics* OMPLDynamicReconfigureConfig::
   if (statics)  // Common case
     return statics;
 
-  boost::mutex::scoped_lock lock(dynamic_reconfigure::__init_mutex__);
+  std::unique_lock<std::mutex> lock(dynamic_reconfigure::__init_mutex__);
 
   if (statics)  // In case we lost a race.
     return statics;
@@ -531,6 +530,4 @@ inline const OMPLDynamicReconfigureConfigStatics* OMPLDynamicReconfigureConfig::
 
   return statics;
 }
-}
-
-#endif  // __OMPLDYNAMICRECONFIGURERECONFIGURATOR_H__
+}  // namespace ompl_interface_ros

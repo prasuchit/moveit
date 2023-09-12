@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_VISUALIZATION_SCENE_DISPLAY_RVIZ_PLUGIN_SCENE_DISPLAY_
-#define MOVEIT_VISUALIZATION_SCENE_DISPLAY_RVIZ_PLUGIN_SCENE_DISPLAY_
+#pragma once
 
 #include <rviz/display.h>
 
@@ -61,7 +60,7 @@ class FloatProperty;
 class RosTopicProperty;
 class ColorProperty;
 class EnumProperty;
-}
+}  // namespace rviz
 
 namespace moveit_rviz_plugin
 {
@@ -71,13 +70,13 @@ class PlanningSceneDisplay : public rviz::Display
 
 public:
   PlanningSceneDisplay(bool listen_to_planning_scene = true, bool show_scene_robot = true);
-  virtual ~PlanningSceneDisplay();
+  ~PlanningSceneDisplay() override;
 
-  virtual void load(const rviz::Config& config);
-  virtual void save(rviz::Config config) const;
+  void load(const rviz::Config& config) override;
+  void save(rviz::Config config) const override;
 
-  virtual void update(float wall_dt, float ros_dt);
-  virtual void reset();
+  void update(float wall_dt, float ros_dt) override;
+  void reset() override;
 
   void setLinkColor(const std::string& link_name, const QColor& color);
   void unsetLinkColor(const std::string& link_name);
@@ -103,7 +102,7 @@ public:
   void clearJobs();
 
   const std::string getMoveGroupNS() const;
-  const robot_model::RobotModelConstPtr& getRobotModel() const;
+  const moveit::core::RobotModelConstPtr& getRobotModel() const;
 
   /// wait for robot state more recent than t
   bool waitForCurrentRobotState(const ros::Time& t = ros::Time::now());
@@ -127,11 +126,13 @@ private Q_SLOTS:
   void changedRobotSceneAlpha();
   void changedSceneAlpha();
   void changedSceneColor();
-  void changedAttachedBodyColor();
   void changedPlanningSceneTopic();
   void changedSceneDisplayTime();
-  void changedOctreeRenderMode();
-  void changedOctreeColorMode();
+  void changedOctreeRendering();
+  void setSceneName(const QString& name);
+
+protected Q_SLOTS:
+  virtual void changedAttachedBodyColor();
 
 protected:
   /// This function reloads the robot model and reinitializes the PlanningSceneMonitor
@@ -140,7 +141,7 @@ protected:
 
   /// This function is used by loadRobotModel() and should only be called in the MainLoop
   /// You probably should not call this function directly
-  void clearRobotModel();
+  virtual void clearRobotModel();
 
   /// This function constructs a new planning scene. Probably this should be called in a background thread
   /// as it may take some time to complete its execution
@@ -148,6 +149,8 @@ protected:
 
   /// This is an event called by loadRobotModel() in the MainLoop; do not call directly
   virtual void onRobotModelLoaded();
+  /// This is called upon successful retrieval of the (initial) planning scene state
+  virtual void onNewPlanningSceneState();
 
   /**
    * \brief Set the scene node's position, given the target frame and the planning frame
@@ -155,7 +158,6 @@ protected:
   void calculateOffsetPosition();
 
   void executeMainLoopJobs();
-  void sceneMonitorReceivedUpdate(planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType update_type);
   void renderPlanningScene();
   void setLinkColor(rviz::Robot* robot, const std::string& link_name, const QColor& color);
   void unsetLinkColor(rviz::Robot* robot, const std::string& link_name);
@@ -164,17 +166,16 @@ protected:
   void unsetAllColors(rviz::Robot* robot);
 
   // overrides from Display
-  virtual void onInitialize();
-  virtual void onEnable();
-  virtual void onDisable();
-  virtual void fixedFrameChanged();
+  void onInitialize() override;
+  void onEnable() override;
+  void onDisable() override;
+  void fixedFrameChanged() override;
 
   // new virtual functions added by this plugin
   virtual void updateInternal(float wall_dt, float ros_dt);
   virtual void onSceneMonitorReceivedUpdate(planning_scene_monitor::PlanningSceneMonitor::SceneUpdateType update_type);
 
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
-  bool model_is_loading_;
   boost::mutex robot_model_loading_lock_;
 
   moveit::tools::BackgroundProcessing background_process_;
@@ -188,7 +189,10 @@ protected:
   RobotStateVisualizationPtr planning_scene_robot_;
   PlanningSceneRenderPtr planning_scene_render_;
 
+  // full update required
   bool planning_scene_needs_render_;
+  // or only the robot position (excluding attached object changes)
+  bool robot_state_needs_render_;
   float current_scene_time_;
 
   rviz::Property* scene_category_;
@@ -211,5 +215,3 @@ protected:
 };
 
 }  // namespace moveit_rviz_plugin
-
-#endif

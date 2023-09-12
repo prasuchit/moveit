@@ -36,6 +36,7 @@
 
 #include <moveit/robot_state_rviz_plugin/robot_state_display.h>
 #include <moveit/robot_state/conversions.h>
+#include <moveit/utils/message_checks.h>
 
 #include <rviz/visualization_manager.h>
 #include <rviz/robot/robot.h>
@@ -49,26 +50,29 @@
 #include <rviz/properties/color_property.h>
 #include <rviz/display_context.h>
 #include <rviz/frame_manager.h>
-#include <tf/transform_listener.h>
 
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
+
+#include <memory>
 
 namespace moveit_rviz_plugin
 {
 // ******************************************************************************************
 // Base class contructor
 // ******************************************************************************************
-RobotStateDisplay::RobotStateDisplay() : Display(), update_state_(false), load_robot_model_(false)
+RobotStateDisplay::RobotStateDisplay() : Display(), update_state_(false)
 {
-  robot_description_property_ = new rviz::StringProperty(
-      "Robot Description", "robot_description", "The name of the ROS parameter where the URDF for the robot is loaded",
-      this, SLOT(changedRobotDescription()), this);
+  robot_description_property_ =
+      new rviz::StringProperty("Robot Description", "robot_description",
+                               "The name of the ROS parameter where the URDF for the robot is loaded", this,
+                               SLOT(changedRobotDescription()), this);
 
-  robot_state_topic_property_ = new rviz::RosTopicProperty(
-      "Robot State Topic", "display_robot_state", ros::message_traits::datatype<moveit_msgs::DisplayRobotState>(),
-      "The topic on which the moveit_msgs::RobotState messages are received", this, SLOT(changedRobotStateTopic()),
-      this);
+  robot_state_topic_property_ =
+      new rviz::RosTopicProperty("Robot State Topic", "display_robot_state",
+                                 ros::message_traits::datatype<moveit_msgs::DisplayRobotState>(),
+                                 "The topic on which the moveit_msgs::DisplayRobotState messages are received", this,
+                                 SLOT(changedRobotStateTopic()), this);
 
   // Planning scene category -------------------------------------------------------------------------------------------
   root_link_name_property_ =
@@ -102,14 +106,12 @@ RobotStateDisplay::RobotStateDisplay() : Display(), update_state_(false), load_r
 // ******************************************************************************************
 // Deconstructor
 // ******************************************************************************************
-RobotStateDisplay::~RobotStateDisplay()
-{
-}
+RobotStateDisplay::~RobotStateDisplay() = default;
 
 void RobotStateDisplay::onInitialize()
 {
   Display::onInitialize();
-  robot_.reset(new RobotStateVisualization(scene_node_, context_, "Robot State", this));
+  robot_ = std::make_shared<RobotStateVisualization>(scene_node_, context_, "Robot State", this);
   changedEnableVisualVisible();
   changedEnableCollisionVisible();
   robot_->setVisible(false);
@@ -120,8 +122,8 @@ void RobotStateDisplay::reset()
   robot_->clear();
   rdf_loader_.reset();
   Display::reset();
-
-  loadRobotModel();
+  if (isEnabled())
+    onEnable();
 }
 
 void RobotStateDisplay::changedAllLinks()
@@ -160,16 +162,16 @@ void RobotStateDisplay::changedEnableLinkHighlight()
 {
   if (enable_link_highlight_->getBool())
   {
-    for (std::map<std::string, std_msgs::ColorRGBA>::iterator it = highlights_.begin(); it != highlights_.end(); ++it)
+    for (std::pair<const std::string, std_msgs::ColorRGBA>& highlight : highlights_)
     {
-      setHighlight(it->first, it->second);
+      setHighlight(highlight.first, highlight.second);
     }
   }
   else
   {
-    for (std::map<std::string, std_msgs::ColorRGBA>::iterator it = highlights_.begin(); it != highlights_.end(); ++it)
+    for (std::pair<const std::string, std_msgs::ColorRGBA>& highlight : highlights_)
     {
-      unsetHighlight(it->first);
+      unsetHighlight(highlight.first);
     }
   }
 }
@@ -195,10 +197,9 @@ void RobotStateDisplay::setRobotHighlights(const moveit_msgs::DisplayRobotState:
     return;
 
   std::map<std::string, std_msgs::ColorRGBA> highlights;
-  for (moveit_msgs::DisplayRobotState::_highlight_links_type::const_iterator it = highlight_links.begin();
-       it != highlight_links.end(); ++it)
+  for (const moveit_msgs::ObjectColor& highlight_link : highlight_links)
   {
-    highlights[it->id] = it->color;
+    highlights[highlight_link.id] = highlight_link.color;
   }
 
   if (enable_link_highlight_->getBool())
@@ -290,9 +291,11 @@ void RobotStateDisplay::changedRobotStateTopic()
   robot_state_subscriber_.shutdown();
 
   // reset model to default state, we don't want to show previous messages
-  if (static_cast<bool>(kstate_))
-    kstate_->setToDefaultValues();
+  if (static_cast<bool>(robot_state_))
+    robot_state_->setToDefaultValues();
   update_state_ = true;
+  robot_->setVisible(false);
+  setStatus(rviz::StatusProperty::Warn, "RobotState", "No msg received");
 
   robot_state_subscriber_ = root_nh_.subscribe(robot_state_topic_property_->getStdString(), 10,
                                                &RobotStateDisplay::newRobotStateCallback, this);
@@ -300,13 +303,35 @@ void RobotStateDisplay::changedRobotStateTopic()
 
 void RobotStateDisplay::newRobotStateCallback(const moveit_msgs::DisplayRobotStateConstPtr& state_msg)
 {
-  if (!kmodel_)
+  if (!robot_model_)
     return;
-  if (!kstate_)
-    kstate_.reset(new robot_state::RobotState(kmodel_));
-  // possibly use TF to construct a robot_state::Transforms object to pass in to the conversion functio?
-  robot_state::robotStateMsgToRobotState(state_msg->state, *kstate_);
-  setRobotHighlights(state_msg->highlight_links);
+  if (!robot_state_)
+    robot_state_ = std::make_shared<moveit::core::RobotState>(robot_model_);
+  // possibly use TF to construct a moveit::core::Transforms object to pass in to the conversion function?
+  try
+  {
+    if (!moveit::core::isEmpty(state_msg->state))
+      moveit::core::robotStateMsgToRobotState(state_msg->state, *robot_state_);
+    setRobotHighlights(state_msg->highlight_links);
+  }
+  catch (const moveit::Exception& e)
+  {
+    robot_state_->setToDefaultValues();
+    setRobotHighlights(moveit_msgs::DisplayRobotState::_highlight_links_type());
+    setStatus(rviz::StatusProperty::Error, "RobotState", e.what());
+    robot_->setVisible(false);
+    return;
+  }
+
+  if (robot_->isVisible() != !state_msg->hide)
+  {
+    robot_->setVisible(!state_msg->hide);
+    if (robot_->isVisible())
+      setStatus(rviz::StatusProperty::Ok, "RobotState", "");
+    else
+      setStatus(rviz::StatusProperty::Warn, "RobotState", "Hidden");
+  }
+
   update_state_ = true;
 }
 
@@ -318,6 +343,11 @@ void RobotStateDisplay::setLinkColor(const std::string& link_name, const QColor&
 void RobotStateDisplay::unsetLinkColor(const std::string& link_name)
 {
   unsetLinkColor(&robot_->getRobot(), link_name);
+}
+
+void RobotStateDisplay::setVisible(bool visible)
+{
+  robot_->setVisible(visible);
 }
 
 void RobotStateDisplay::setLinkColor(rviz::Robot* robot, const std::string& link_name, const QColor& color)
@@ -343,38 +373,52 @@ void RobotStateDisplay::unsetLinkColor(rviz::Robot* robot, const std::string& li
 // ******************************************************************************************
 void RobotStateDisplay::loadRobotModel()
 {
-  load_robot_model_ = false;
-  if (!rdf_loader_)
-    rdf_loader_.reset(new rdf_loader::RDFLoader(robot_description_property_->getStdString()));
+  rdf_loader_ = std::make_shared<rdf_loader::RDFLoader>(robot_description_property_->getStdString());
 
   if (rdf_loader_->getURDF())
   {
-    const srdf::ModelSharedPtr& srdf =
-        rdf_loader_->getSRDF() ? rdf_loader_->getSRDF() : srdf::ModelSharedPtr(new srdf::Model());
-    kmodel_.reset(new robot_model::RobotModel(rdf_loader_->getURDF(), srdf));
-    robot_->load(*kmodel_->getURDF());
-    kstate_.reset(new robot_state::RobotState(kmodel_));
-    kstate_->setToDefaultValues();
-    bool oldState = root_link_name_property_->blockSignals(true);
-    root_link_name_property_->setStdString(getRobotModel()->getRootLinkName());
-    root_link_name_property_->blockSignals(oldState);
-    update_state_ = true;
-    setStatus(rviz::StatusProperty::Ok, "RobotState", "Planning Model Loaded Successfully");
+    try
+    {
+      const srdf::ModelSharedPtr& srdf =
+          rdf_loader_->getSRDF() ? rdf_loader_->getSRDF() : std::make_shared<srdf::Model>();
+      robot_model_ = std::make_shared<moveit::core::RobotModel>(rdf_loader_->getURDF(), srdf);
+      robot_->load(*robot_model_->getURDF());
+      robot_state_ = std::make_shared<moveit::core::RobotState>(robot_model_);
+      robot_state_->setToDefaultValues();
+      bool old_state = root_link_name_property_->blockSignals(true);
+      root_link_name_property_->setStdString(getRobotModel()->getRootLinkName());
+      root_link_name_property_->blockSignals(old_state);
+      update_state_ = true;
+      setStatus(rviz::StatusProperty::Ok, "RobotModel", "Loaded successfully");
 
-    changedEnableVisualVisible();
-    changedEnableCollisionVisible();
-    robot_->setVisible(true);
+      changedEnableVisualVisible();
+      changedEnableCollisionVisible();
+    }
+    catch (std::exception& e)
+    {
+      setStatus(rviz::StatusProperty::Error, "RobotModel", QString("Loading failed: %1").arg(e.what()));
+    }
   }
   else
-    setStatus(rviz::StatusProperty::Error, "RobotState", "No Planning Model Loaded");
+    setStatus(rviz::StatusProperty::Error, "RobotModel", "Loading failed");
 
   highlights_.clear();
+}
+
+void RobotStateDisplay::load(const rviz::Config& config)
+{
+  // This property needs to be loaded in onEnable() below, which is triggered
+  // in the beginning of Display::load() before the other property would be available
+  robot_description_property_->load(config.mapGetChild("Robot Description"));
+  Display::load(config);
 }
 
 void RobotStateDisplay::onEnable()
 {
   Display::onEnable();
-  load_robot_model_ = true;  // allow loading of robot model in update()
+  if (!rdf_loader_)
+    loadRobotModel();
+  changedRobotStateTopic();
   calculateOffsetPosition();
 }
 
@@ -392,19 +436,12 @@ void RobotStateDisplay::onDisable()
 void RobotStateDisplay::update(float wall_dt, float ros_dt)
 {
   Display::update(wall_dt, ros_dt);
-
-  if (load_robot_model_)
-  {
-    loadRobotModel();
-    changedRobotStateTopic();
-  }
-
   calculateOffsetPosition();
-  if (robot_ && update_state_ && kstate_)
+  if (robot_ && update_state_ && robot_state_)
   {
     update_state_ = false;
-    kstate_->update();
-    robot_->update(kstate_);
+    robot_state_->update();
+    robot_->update(robot_state_);
   }
 }
 

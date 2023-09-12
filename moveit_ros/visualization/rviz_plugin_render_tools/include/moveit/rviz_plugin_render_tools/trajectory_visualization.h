@@ -34,9 +34,9 @@
 
 /* Author: Dave Coleman */
 
-#ifndef MOVEIT_TRAJECTORY_RVIZ_PLUGIN__TRAJECTORY_VISUALIZATION
-#define MOVEIT_TRAJECTORY_RVIZ_PLUGIN__TRAJECTORY_VISUALIZATION
+#pragma once
 
+#include <boost/thread/mutex.hpp>
 #include <moveit/macros/class_forward.h>
 #include <rviz/display.h>
 #include <rviz/panel_dock_widget.h>
@@ -64,11 +64,11 @@ class RosTopicProperty;
 class EditableEnumProperty;
 class ColorProperty;
 class MovableText;
-}
+}  // namespace rviz
 
 namespace moveit_rviz_plugin
 {
-MOVEIT_CLASS_FORWARD(TrajectoryVisualization);
+MOVEIT_CLASS_FORWARD(TrajectoryVisualization);  // Defines TrajectoryVisualizationPtr, ConstPtr, WeakPtr... etc
 
 class TrajectoryVisualization : public QObject
 {
@@ -83,13 +83,14 @@ public:
    */
   TrajectoryVisualization(rviz::Property* widget, rviz::Display* display);
 
-  virtual ~TrajectoryVisualization();
+  ~TrajectoryVisualization() override;
 
-  virtual void update(float wall_dt, float ros_dt);
+  virtual void update(float wall_dt, float sim_dt);
   virtual void reset();
 
-  void onInitialize(Ogre::SceneNode* scene_node, rviz::DisplayContext* context, ros::NodeHandle update_nh);
-  void onRobotModelLoaded(robot_model::RobotModelConstPtr robot_model);
+  void onInitialize(Ogre::SceneNode* scene_node, rviz::DisplayContext* context, const ros::NodeHandle& update_nh);
+  void clearRobotModel();
+  void onRobotModelLoaded(const moveit::core::RobotModelConstPtr& robot_model);
   void onEnable();
   void onDisable();
   void setName(const QString& name);
@@ -98,6 +99,7 @@ public:
 
 public Q_SLOTS:
   void interruptCurrentDisplay();
+  void setDefaultAttachedObjectColor(const QColor& color);
 
 private Q_SLOTS:
 
@@ -121,11 +123,17 @@ protected:
    * \brief ROS callback for an incoming path message
    */
   void incomingDisplayTrajectory(const moveit_msgs::DisplayTrajectory::ConstPtr& msg);
+  /**
+   * \brief get time to show each single robot state
+   * \return Positive values indicate a fixed time per state
+   *         Negative values indicate a realtime-factor
+   */
   float getStateDisplayTime();
   void clearTrajectoryTrail();
 
   // Handles actually drawing the robot along motion plans
   RobotStateVisualizationPtr display_path_robot_;
+  std_msgs::ColorRGBA default_attached_object_color_;
 
   // Handle colouring of robot
   void setRobotColor(rviz::Robot* robot, const QColor& color);
@@ -133,7 +141,7 @@ protected:
 
   robot_trajectory::RobotTrajectoryPtr displaying_trajectory_message_;
   robot_trajectory::RobotTrajectoryPtr trajectory_message_to_display_;
-  std::vector<rviz::Robot*> trajectory_trail_;
+  std::vector<RobotStateVisualizationUniquePtr> trajectory_trail_;
   ros::Subscriber trajectory_topic_sub_;
   bool animating_path_;
   bool drop_displaying_trajectory_;
@@ -141,10 +149,10 @@ protected:
   float current_state_time_;
   boost::mutex update_trajectory_message_;
 
-  robot_model::RobotModelConstPtr robot_model_;
-  robot_state::RobotStatePtr robot_state_;
+  moveit::core::RobotModelConstPtr robot_model_;
+  moveit::core::RobotStatePtr robot_state_;
 
-  // Pointers from parent display taht we save
+  // Pointers from parent display that we save
   rviz::Display* display_;  // the parent display that this class populates
   rviz::Property* widget_;
   Ogre::SceneNode* scene_node_;
@@ -160,6 +168,7 @@ protected:
   rviz::RosTopicProperty* trajectory_topic_property_;
   rviz::FloatProperty* robot_path_alpha_property_;
   rviz::BoolProperty* loop_display_property_;
+  rviz::BoolProperty* use_sim_time_property_;
   rviz::BoolProperty* trail_display_property_;
   rviz::BoolProperty* interrupt_display_property_;
   rviz::ColorProperty* robot_color_property_;
@@ -168,5 +177,3 @@ protected:
 };
 
 }  // namespace moveit_rviz_plugin
-
-#endif

@@ -1,37 +1,37 @@
 /*********************************************************************
-* Software License Agreement (BSD License)
-*
-*  Copyright (c) 2013, Ioan A. Sucan
-*  Copyright (c) 2008-2013, Willow Garage, Inc.
-*  All rights reserved.
-*
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
-*
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of the Willow Garage nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
-*
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
-*********************************************************************/
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2013, Ioan A. Sucan
+ *  Copyright (c) 2008-2013, Willow Garage, Inc.
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the Willow Garage nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 /* Author: Ioan Sucan */
 
@@ -90,6 +90,11 @@ int JointModel::getLocalVariableIndex(const std::string& variable) const
   return it->second;
 }
 
+bool JointModel::harmonizePosition(double* /*values*/, const Bounds& /*other_bounds*/) const
+{
+  return false;
+}
+
 bool JointModel::enforceVelocityBounds(double* values, const Bounds& other_bounds) const
 {
   bool change = false;
@@ -110,10 +115,32 @@ bool JointModel::enforceVelocityBounds(double* values, const Bounds& other_bound
 bool JointModel::satisfiesVelocityBounds(const double* values, const Bounds& other_bounds, double margin) const
 {
   for (std::size_t i = 0; i < other_bounds.size(); ++i)
+  {
+    if (!other_bounds[i].velocity_bounded_)
+    {
+      continue;
+    }
     if (other_bounds[i].max_velocity_ + margin < values[i])
       return false;
     else if (other_bounds[i].min_velocity_ - margin > values[i])
       return false;
+  }
+  return true;
+}
+
+bool JointModel::satisfiesAccelerationBounds(const double* values, const Bounds& other_bounds, double margin) const
+{
+  for (std::size_t i = 0; i < other_bounds.size(); ++i)
+  {
+    if (!other_bounds[i].acceleration_bounded_)
+    {
+      continue;
+    }
+    if (other_bounds[i].max_acceleration_ + margin < values[i])
+      return false;
+    else if (other_bounds[i].min_acceleration_ - margin > values[i])
+      return false;
+  }
   return true;
 }
 
@@ -131,26 +158,26 @@ void JointModel::setVariableBounds(const std::string& variable, const VariableBo
 void JointModel::setVariableBounds(const std::vector<moveit_msgs::JointLimits>& jlim)
 {
   for (std::size_t j = 0; j < variable_names_.size(); ++j)
-    for (std::size_t i = 0; i < jlim.size(); ++i)
-      if (jlim[i].joint_name == variable_names_[j])
+    for (const moveit_msgs::JointLimits& joint_limit : jlim)
+      if (joint_limit.joint_name == variable_names_[j])
       {
-        variable_bounds_[j].position_bounded_ = jlim[i].has_position_limits;
-        if (jlim[i].has_position_limits)
+        variable_bounds_[j].position_bounded_ = joint_limit.has_position_limits;
+        if (joint_limit.has_position_limits)
         {
-          variable_bounds_[j].min_position_ = jlim[i].min_position;
-          variable_bounds_[j].max_position_ = jlim[i].max_position;
+          variable_bounds_[j].min_position_ = joint_limit.min_position;
+          variable_bounds_[j].max_position_ = joint_limit.max_position;
         }
-        variable_bounds_[j].velocity_bounded_ = jlim[i].has_velocity_limits;
-        if (jlim[i].has_velocity_limits)
+        variable_bounds_[j].velocity_bounded_ = joint_limit.has_velocity_limits;
+        if (joint_limit.has_velocity_limits)
         {
-          variable_bounds_[j].min_velocity_ = -jlim[i].max_velocity;
-          variable_bounds_[j].max_velocity_ = jlim[i].max_velocity;
+          variable_bounds_[j].min_velocity_ = -joint_limit.max_velocity;
+          variable_bounds_[j].max_velocity_ = joint_limit.max_velocity;
         }
-        variable_bounds_[j].acceleration_bounded_ = jlim[i].has_acceleration_limits;
-        if (jlim[i].has_acceleration_limits)
+        variable_bounds_[j].acceleration_bounded_ = joint_limit.has_acceleration_limits;
+        if (joint_limit.has_acceleration_limits)
         {
-          variable_bounds_[j].min_acceleration_ = -jlim[i].max_acceleration;
-          variable_bounds_[j].max_acceleration_ = jlim[i].max_acceleration;
+          variable_bounds_[j].min_acceleration_ = -joint_limit.max_acceleration;
+          variable_bounds_[j].max_acceleration_ = joint_limit.max_acceleration;
         }
         break;
       }
@@ -211,7 +238,7 @@ inline void printBoundHelper(std::ostream& out, double v)
   else
     out << v;
 }
-}
+}  // namespace
 
 std::ostream& operator<<(std::ostream& out, const VariableBounds& b)
 {

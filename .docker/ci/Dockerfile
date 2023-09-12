@@ -1,41 +1,50 @@
-# moveit/moveit:kinetic-ci
+# moveit/moveit:noetic-ci
 # Sets up a base image to use for running Continuous Integration on Travis
 
-FROM ros:kinetic-ros-base
-MAINTAINER Dave Coleman dave@dav.ee
+ARG ROS_DISTRO=noetic
+FROM ros:${ROS_DISTRO}-ros-base
+MAINTAINER Dave Coleman dave@picknik.ai
 
 ENV TERM xterm
 
-# Setup catkin workspace
-ENV CATKIN_WS=/root/ws_moveit
-RUN mkdir -p $CATKIN_WS/src
-WORKDIR $CATKIN_WS/src
+# Setup (temporary) ROS workspace
+WORKDIR /root/ws_moveit
+
+# Copy MoveIt sources from docker context
+COPY . src/moveit
 
 # Commands are combined in single RUN statement with "apt/lists" folder removal to reduce image size
-RUN wstool init . && \
-    # Download moveit source so that we can get necessary dependencies
-    wstool merge https://raw.githubusercontent.com/ros-planning/moveit/${ROS_DISTRO}-devel/moveit.rosinstall && \
-    wstool update && \
-    # Update apt-get because previous images clear this cache
-    apt-get -qq update && \
+# https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#minimize-the-number-of-layers
+RUN \
+    # Update apt package list as previous containers clear the cache
+    apt-get -q update && \
+    apt-get -q -y dist-upgrade && \
+    #
     # Install some base dependencies
-    apt-get -qq install -y \
-        # Some source builds require a package.xml be downloaded via wget from an external location
-        wget \
-        # Required for rosdep command
-        sudo \
-        # Required for installing dependencies
-        python-rosdep \
-        # Preferred build tool
-        python-catkin-tools && \
-    # Download all dependencies of MoveIt!
-    rosdep update && \
-    rosdep install -y --from-paths . --ignore-src --rosdistro ${ROS_DISTRO} --as-root=apt:false && \
-    # Remove the source code from this container. TODO: in the future we may want to keep this here for further optimization of later containers
-    cd .. && \
-    rm -rf src/ && \
+    apt-get -q install --no-install-recommends -y \
+        # Some basic requirements
+        wget git sudo \
+        # Preferred build tools
+        python$(test "${ROS_DISTRO}" = "noetic" && echo 3)-catkin-tools \
+        clang clang-format-10 clang-tidy clang-tools \
+        ccache && \
+    #
+    # Download MoveIt sources, so that we can fetch all necessary dependencies
+    wstool init --shallow src src/moveit/.github/workflows/upstream.rosinstall && \
+    git clone --depth 1 --branch master https://github.com/ros-planning/moveit_resources src/moveit_resources && \
+    #
+    # Download all dependencies of MoveIt
+    rosdep update $(test "${ROS_DISTRO}" = "melodic" && echo "--include-eol-distros") && \
+    DEBIAN_FRONTEND=noninteractive \
+    rosdep install -y --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} --as-root=apt:false && \
+    # Remove the source code from this container
+    rm -rf src && \
+    #
     # Clear apt-cache to reduce image size
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    # Globally disable git security
+    # https://github.blog/2022-04-12-git-security-vulnerability-announced
+    git config --global --add safe.directory "*"
 
 # Continous Integration Setting
 ENV IN_DOCKER 1

@@ -34,8 +34,7 @@
 
 /* Author: Mrinal Kalakrishnan, Acorn Pooley */
 
-#ifndef MOVEIT_DISTANCE_FIELD_VOXEL_GRID_
-#define MOVEIT_DISTANCE_FIELD_VOXEL_GRID_
+#pragma once
 
 #include <algorithm>
 #include <cmath>
@@ -243,7 +242,7 @@ public:
    * @return True, as there is no check that the integer locations are valid
    */
   void gridToWorld(int x, int y, int z, double& world_x, double& world_y, double& world_z) const;
-  void gridToWorld(const Eigen::Vector3i& grid, Eigen::Vector3i& world) const;
+  void gridToWorld(const Eigen::Vector3i& grid, Eigen::Vector3d& world) const;
 
   /**
    * \brief Converts from a world location to a set of integer
@@ -262,7 +261,7 @@ public:
    * that pass a validity check; otherwise False.
    */
   bool worldToGrid(double world_x, double world_y, double world_z, int& x, int& y, int& z) const;
-  bool worldToGrid(const Eigen::Vector3i& world, Eigen::Vector3i& grid) const;
+  bool worldToGrid(const Eigen::Vector3d& world, Eigen::Vector3i& grid) const;
 
   /**
    * \brief Checks if the given cell in integer coordinates is within the voxel grid
@@ -342,7 +341,7 @@ protected:
 template <typename T>
 VoxelGrid<T>::VoxelGrid(double size_x, double size_y, double size_z, double resolution, double origin_x,
                         double origin_y, double origin_z, T default_object)
-  : data_(NULL)
+  : data_(nullptr)
 {
   resize(size_x, size_y, size_z, resolution, origin_x, origin_y, origin_z, default_object);
 }
@@ -369,7 +368,7 @@ void VoxelGrid<T>::resize(double size_x, double size_y, double size_z, double re
                           double origin_y, double origin_z, T default_object)
 {
   delete[] data_;
-  data_ = NULL;
+  data_ = nullptr;
 
   size_[DIM_X] = size_x;
   size_[DIM_Y] = size_y;
@@ -442,7 +441,7 @@ inline double VoxelGrid<T>::getResolution() const
 }
 
 template <typename T>
-inline double VoxelGrid<T>::getResolution(Dimension dim) const
+inline double VoxelGrid<T>::getResolution(Dimension /*dim*/) const
 {
   return resolution_;
 }
@@ -462,12 +461,12 @@ inline int VoxelGrid<T>::getNumCells(Dimension dim) const
 template <typename T>
 inline const T& VoxelGrid<T>::operator()(double x, double y, double z) const
 {
-  int cellX = getCellFromLocation(DIM_X, x);
-  int cellY = getCellFromLocation(DIM_Y, y);
-  int cellZ = getCellFromLocation(DIM_Z, z);
-  if (!isCellValid(cellX, cellY, cellZ))
+  int cell_x = getCellFromLocation(DIM_X, x);
+  int cell_y = getCellFromLocation(DIM_Y, y);
+  int cell_z = getCellFromLocation(DIM_Z, z);
+  if (!isCellValid(cell_x, cell_y, cell_z))
     return default_object_;
-  return getCell(cellX, cellY, cellZ);
+  return getCell(cell_x, cell_y, cell_z);
 }
 
 template <typename T>
@@ -553,7 +552,7 @@ inline void VoxelGrid<T>::gridToWorld(int x, int y, int z, double& world_x, doub
 }
 
 template <typename T>
-inline void VoxelGrid<T>::gridToWorld(const Eigen::Vector3i& grid, Eigen::Vector3i& world) const
+inline void VoxelGrid<T>::gridToWorld(const Eigen::Vector3i& grid, Eigen::Vector3d& world) const
 {
   world.x() = getLocationFromCell(DIM_X, grid.x());
   world.y() = getLocationFromCell(DIM_Y, grid.y());
@@ -570,7 +569,7 @@ inline bool VoxelGrid<T>::worldToGrid(double world_x, double world_y, double wor
 }
 
 template <typename T>
-inline bool VoxelGrid<T>::worldToGrid(const Eigen::Vector3i& world, Eigen::Vector3i& grid) const
+inline bool VoxelGrid<T>::worldToGrid(const Eigen::Vector3d& world, Eigen::Vector3i& grid) const
 {
   grid.x() = getCellFromLocation(DIM_X, world.x());
   grid.y() = getCellFromLocation(DIM_Y, world.y());
@@ -579,4 +578,3 @@ inline bool VoxelGrid<T>::worldToGrid(const Eigen::Vector3i& world, Eigen::Vecto
 }
 
 }  // namespace distance_field
-#endif

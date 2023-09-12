@@ -35,11 +35,12 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_CORE_ROBOT_MODEL_
-#define MOVEIT_CORE_ROBOT_MODEL_
+#pragma once
 
 #include <moveit/macros/class_forward.h>
 #include <moveit/exceptions/exceptions.h>
+#include <moveit/utils/lexical_casts.h>
+
 #include <urdf/model.h>
 #include <srdfdom/model.h>
 
@@ -54,13 +55,22 @@
 #include <Eigen/Geometry>
 #include <iostream>
 
-/** \brief Main namespace for MoveIt! */
+/** \brief Main namespace for MoveIt */
 namespace moveit
 {
-/** \brief Core components of MoveIt! */
+/** \brief Core components of MoveIt */
 namespace core
 {
-MOVEIT_CLASS_FORWARD(RobotModel);
+MOVEIT_CLASS_FORWARD(RobotModel);  // Defines RobotModelPtr, ConstPtr, WeakPtr... etc
+
+static inline void checkInterpolationParamBounds(const char LOGNAME[], double t)
+{
+  if (std::isnan(t) || std::isinf(t))
+  {
+    throw Exception("Interpolation parameter is NaN or inf.");
+  }
+  ROS_WARN_STREAM_COND_NAMED(t < 0. || t > 1., LOGNAME, "Interpolation parameter is not in the range [0, 1]: " << t);
+}
 
 /** \brief Definition of a kinematic model. This class is not thread
     safe, however multiple instances can be created */
@@ -91,7 +101,7 @@ public:
   /** \brief Return true if the model is empty (has no root link, no joints) */
   bool isEmpty() const
   {
-    return root_link_ == NULL;
+    return root_link_ == nullptr;
   }
 
   /** \brief Get the parsed URDF model */
@@ -164,6 +174,12 @@ public:
     return active_joint_model_vector_const_;
   }
 
+  /** \brief Get the array of active joint names, in the order they appear in the robot state. */
+  const std::vector<std::string>& getActiveJointModelNames() const
+  {
+    return active_joint_model_names_vector_;
+  }
+
   /** \brief Get the array of joints that are active (not fixed, not mimic) in this model */
   const std::vector<JointModel*>& getActiveJointModels()
   {
@@ -226,19 +242,24 @@ public:
     return getRootLink()->getName();
   }
 
-  /** \brief Check if a link exists. Return true if it does. */
+  /** \brief Check if a link exists. Return true if it does.
+   *
+   * If this is followed by a call to getLinkModel(), better use the latter with the has_link argument */
   bool hasLinkModel(const std::string& name) const;
 
   /** \brief Get a link by its name. Output error and return NULL when the link is missing. */
-  const LinkModel* getLinkModel(const std::string& link) const;
+  const LinkModel* getLinkModel(const std::string& link, bool* has_link = nullptr) const;
 
   /** \brief Get a link by its index. Output error and return NULL when the link is missing. */
   const LinkModel* getLinkModel(int index) const;
 
   /** \brief Get a link by its name. Output error and return NULL when the link is missing. */
-  LinkModel* getLinkModel(const std::string& link);
+  LinkModel* getLinkModel(const std::string& link, bool* has_link = nullptr);
 
   /** \brief Get the latest link upwards the kinematic tree, which is only connected via fixed joints
+   *
+   * If jmg is given, all links that are not active in this JMG are considered fixed.
+   * Otherwise only fixed joints are considered fixed.
    *
    * This is useful, if the link should be warped to a specific pose using updateStateWithLinkAt().
    * As updateStateWithLinkAt() warps only the specified link and its descendants, you might not
@@ -249,7 +270,15 @@ public:
    * what you went for. Instead, updateStateWithLinkAt(getRigidlyConnectedParentLinkModel(grasp_frame), ...)
    * will actually warp wrist (and all its descendants).
    */
-  static const moveit::core::LinkModel* getRigidlyConnectedParentLinkModel(const LinkModel* link);
+  static const moveit::core::LinkModel* getRigidlyConnectedParentLinkModel(const LinkModel* link,
+                                                                           Eigen::Isometry3d& transform,
+                                                                           const JointModelGroup* jmg = nullptr);
+  static const moveit::core::LinkModel* getRigidlyConnectedParentLinkModel(const LinkModel* link,
+                                                                           const JointModelGroup* jmg = nullptr)
+  {
+    Eigen::Isometry3d unused;
+    return getRigidlyConnectedParentLinkModel(link, unused, jmg);
+  }
 
   /** \brief Get the array of links  */
   const std::vector<const LinkModel*>& getLinkModels() const
@@ -337,7 +366,17 @@ public:
   }
   double getMaximumExtent(const JointBoundsVector& active_joint_bounds) const;
 
+  /** \brief Return the sum of joint distances between two states. Only considers active joints. */
   double distance(const double* state1, const double* state2) const;
+
+  /**
+   * Interpolate between "from" state, to "to" state. Mimic joints are correctly updated.
+   *
+   * @param from interpolate from this state
+   * @param to to this state
+   * @param t a fraction in the range [0 1]. If 1, the result matches "to" state exactly.
+   * @param state holds the result
+   */
   void interpolate(const double* from, const double* to, double t, double* state) const;
 
   /** \name Access to joint groups
@@ -428,15 +467,15 @@ public:
       return b;
     if (!b)
       return a;
-    return joint_model_vector_[common_joint_roots_[a->getJointIndex() * joint_model_vector_.size() +
-                                                   b->getJointIndex()]];
+    return joint_model_vector_[common_joint_roots_[a->getJointIndex() * joint_model_vector_.size() + b->getJointIndex()]];
   }
 
   /// A map of known kinematics solvers (associated to their group name)
   void setKinematicsAllocators(const std::map<std::string, SolverAllocatorFn>& allocators);
 
 protected:
-  void computeFixedTransforms(const LinkModel* link, const Eigen::Affine3d& transform,
+  /** \brief Get the transforms between link and all its rigidly attached descendants */
+  void computeFixedTransforms(const LinkModel* link, const Eigen::Isometry3d& transform,
                               LinkTransformMap& associated_transforms);
 
   /** \brief Given two joints, find their common root */
@@ -447,10 +486,11 @@ protected:
 
   // GENERIC INFO
 
-  /** \brief The name of the model */
+  /** \brief The name of the robot */
   std::string model_name_;
 
-  /** \brief The reference frame for this model */
+  /** \brief The reference (base) frame for this model. The frame is either extracted from the SRDF as a virtual joint,
+   * or it is assumed to be the name of the root link in the URDF */
   std::string model_frame_;
 
   srdf::ModelConstSharedPtr srdf_;
@@ -502,6 +542,9 @@ protected:
 
   /** \brief The vector of joints in the model, in the order they appear in the state vector */
   std::vector<JointModel*> active_joint_model_vector_;
+
+  /** \brief The vector of joint names that corresponds to active_joint_model_vector_ */
+  std::vector<std::string> active_joint_model_names_vector_;
 
   /** \brief The vector of joints in the model, in the order they appear in the state vector */
   std::vector<const JointModel*> active_joint_model_vector_const_;
@@ -574,10 +617,10 @@ protected:
   void buildGroups(const srdf::Model& srdf_model);
 
   /** \brief Compute helpful information about groups (that can be queried later) */
-  void buildGroupsInfo_Subgroups(const srdf::Model& srdf_model);
+  void buildGroupsInfoSubgroups();
 
   /** \brief Compute helpful information about groups (that can be queried later) */
-  void buildGroupsInfo_EndEffectors(const srdf::Model& srdf_model);
+  void buildGroupsInfoEndEffectors(const srdf::Model& srdf_model);
 
   /** \brief Given the URDF model, build up the mimic joints (mutually constrained joints) */
   void buildMimic(const urdf::ModelInterface& urdf_model);
@@ -612,10 +655,8 @@ protected:
   /** \brief Given a geometry spec from the URDF and a filename (for a mesh), construct the corresponding shape object*/
   shapes::ShapePtr constructShape(const urdf::Geometry* geom);
 };
-}
-}
+}  // namespace core
+}  // namespace moveit
 
 namespace robot_model = moveit::core;
 namespace robot_state = moveit::core;
-
-#endif

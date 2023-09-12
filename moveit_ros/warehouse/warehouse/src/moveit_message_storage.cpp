@@ -36,39 +36,39 @@
 
 #include <moveit/warehouse/moveit_message_storage.h>
 #include <warehouse_ros/database_loader.h>
-//#include <warehouse_ros_mongo/database_connection.h>
 #include <boost/regex.hpp>
 #include <memory>
+#include <utility>
 
-moveit_warehouse::MoveItMessageStorage::MoveItMessageStorage(warehouse_ros::DatabaseConnection::Ptr conn) : conn_(conn)
+moveit_warehouse::MoveItMessageStorage::MoveItMessageStorage(warehouse_ros::DatabaseConnection::Ptr conn)
+  : conn_(std::move(conn))
 {
 }
 
-void moveit_warehouse::MoveItMessageStorage::filterNames(const std::string& regex,
-                                                         std::vector<std::string>& names) const
+void moveit_warehouse::MoveItMessageStorage::filterNames(const std::string& regex, std::vector<std::string>& names) const
 {
   if (!regex.empty())
   {
     std::vector<std::string> fnames;
     boost::regex r(regex);
-    for (std::size_t i = 0; i < names.size(); ++i)
+    for (std::string& name : names)
     {
       boost::cmatch match;
-      if (boost::regex_match(names[i].c_str(), match, r))
-        fnames.push_back(names[i]);
+      if (boost::regex_match(name.c_str(), match, r))
+        fnames.push_back(name);
     }
     names.swap(fnames);
   }
 }
 
-static std::unique_ptr<warehouse_ros::DatabaseLoader> dbloader;
+static std::unique_ptr<warehouse_ros::DatabaseLoader> DBLOADER;
 
 typename warehouse_ros::DatabaseConnection::Ptr moveit_warehouse::loadDatabase()
 {
-  if (!dbloader)
+  if (!DBLOADER)
   {
-    dbloader.reset(new warehouse_ros::DatabaseLoader());
+    DBLOADER = std::make_unique<warehouse_ros::DatabaseLoader>();
   }
-  return dbloader->loadDatabase();
+  return DBLOADER->loadDatabase();
   // return typename warehouse_ros::DatabaseConnection::Ptr(new warehouse_ros_mongo::MongoDatabaseConnection());
 }

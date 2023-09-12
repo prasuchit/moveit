@@ -49,9 +49,13 @@ public:
   static const std::string JIGGLE_PARAM_NAME;
   static const std::string ATTEMPTS_PARAM_NAME;
 
-  FixStartStateCollision() : planning_request_adapter::PlanningRequestAdapter(), nh_("~")
+  FixStartStateCollision() : planning_request_adapter::PlanningRequestAdapter()
   {
-    if (!nh_.getParam(DT_PARAM_NAME, max_dt_offset_))
+  }
+
+  void initialize(const ros::NodeHandle& nh) override
+  {
+    if (!nh.getParam(DT_PARAM_NAME, max_dt_offset_))
     {
       max_dt_offset_ = 0.5;
       ROS_INFO_STREAM("Param '" << DT_PARAM_NAME << "' was not set. Using default value: " << max_dt_offset_);
@@ -59,7 +63,7 @@ public:
     else
       ROS_INFO_STREAM("Param '" << DT_PARAM_NAME << "' was set to " << max_dt_offset_);
 
-    if (!nh_.getParam(JIGGLE_PARAM_NAME, jiggle_fraction_))
+    if (!nh.getParam(JIGGLE_PARAM_NAME, jiggle_fraction_))
     {
       jiggle_fraction_ = 0.02;
       ROS_INFO_STREAM("Param '" << JIGGLE_PARAM_NAME << "' was not set. Using default value: " << jiggle_fraction_);
@@ -67,7 +71,7 @@ public:
     else
       ROS_INFO_STREAM("Param '" << JIGGLE_PARAM_NAME << "' was set to " << jiggle_fraction_);
 
-    if (!nh_.getParam(ATTEMPTS_PARAM_NAME, sampling_attempts_))
+    if (!nh.getParam(ATTEMPTS_PARAM_NAME, sampling_attempts_))
     {
       sampling_attempts_ = 100;
       ROS_INFO_STREAM("Param '" << ATTEMPTS_PARAM_NAME << "' was not set. Using default value: " << sampling_attempts_);
@@ -83,21 +87,20 @@ public:
     }
   }
 
-  virtual std::string getDescription() const
+  std::string getDescription() const override
   {
     return "Fix Start State In Collision";
   }
 
-  virtual bool adaptAndPlan(const PlannerFn& planner, const planning_scene::PlanningSceneConstPtr& planning_scene,
-                            const planning_interface::MotionPlanRequest& req,
-                            planning_interface::MotionPlanResponse& res,
-                            std::vector<std::size_t>& added_path_index) const
+  bool adaptAndPlan(const PlannerFn& planner, const planning_scene::PlanningSceneConstPtr& planning_scene,
+                    const planning_interface::MotionPlanRequest& req, planning_interface::MotionPlanResponse& res,
+                    std::vector<std::size_t>& added_path_index) const override
   {
     ROS_DEBUG("Running '%s'", getDescription().c_str());
 
     // get the specified start state
-    robot_state::RobotState start_state = planning_scene->getCurrentState();
-    robot_state::robotStateMsgToRobotState(planning_scene->getTransforms(), req.start_state, start_state);
+    moveit::core::RobotState start_state = planning_scene->getCurrentState();
+    moveit::core::robotStateMsgToRobotState(planning_scene->getTransforms(), req.start_state, start_state);
 
     collision_detection::CollisionRequest creq;
     creq.group_name = req.group_name;
@@ -116,10 +119,10 @@ public:
       else
         ROS_INFO_STREAM("Start state appears to be in collision with respect to group " << creq.group_name);
 
-      robot_state::RobotStatePtr prefix_state(new robot_state::RobotState(start_state));
+      moveit::core::RobotStatePtr prefix_state(new moveit::core::RobotState(start_state));
       random_numbers::RandomNumberGenerator& rng = prefix_state->getRandomNumberGenerator();
 
-      const std::vector<const robot_model::JointModel*>& jmodels =
+      const std::vector<const moveit::core::JointModel*>& jmodels =
           planning_scene->getRobotModel()->hasJointModelGroup(req.group_name) ?
               planning_scene->getRobotModel()->getJointModelGroup(req.group_name)->getJointModels() :
               planning_scene->getRobotModel()->getJointModels();
@@ -148,28 +151,29 @@ public:
       if (found)
       {
         planning_interface::MotionPlanRequest req2 = req;
-        robot_state::robotStateToRobotStateMsg(start_state, req2.start_state);
+        moveit::core::robotStateToRobotStateMsg(start_state, req2.start_state);
         bool solved = planner(planning_scene, req2, res);
         if (solved && !res.trajectory_->empty())
         {
           // heuristically decide a duration offset for the trajectory (induced by the additional point added as a
           // prefix to the computed trajectory)
-          res.trajectory_->setWayPointDurationFromPrevious(
-              0, std::min(max_dt_offset_, res.trajectory_->getAverageSegmentDuration()));
+          res.trajectory_->setWayPointDurationFromPrevious(0, std::min(max_dt_offset_,
+                                                                       res.trajectory_->getAverageSegmentDuration()));
           res.trajectory_->addPrefixWayPoint(prefix_state, 0.0);
           // we add a prefix point, so we need to bump any previously added index positions
-          for (std::size_t i = 0; i < added_path_index.size(); ++i)
-            added_path_index[i]++;
+          for (std::size_t& added_index : added_path_index)
+            added_index++;
           added_path_index.push_back(0);
         }
         return solved;
       }
       else
       {
-        ROS_WARN("Unable to find a valid state nearby the start state (using jiggle fraction of %lf and %u sampling "
-                 "attempts). Passing the original planning request to the planner.",
+        ROS_WARN("Unable to find a valid state nearby the start state "
+                 "(using jiggle fraction of %lf and %u sampling attempts).",
                  jiggle_fraction_, sampling_attempts_);
-        return planner(planning_scene, req, res);
+        res.error_code_.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
+        return false;
       }
     }
     else
@@ -183,7 +187,6 @@ public:
   }
 
 private:
-  ros::NodeHandle nh_;
   double max_dt_offset_;
   double jiggle_fraction_;
   int sampling_attempts_;
@@ -192,7 +195,7 @@ private:
 const std::string FixStartStateCollision::DT_PARAM_NAME = "start_state_max_dt";
 const std::string FixStartStateCollision::JIGGLE_PARAM_NAME = "jiggle_fraction";
 const std::string FixStartStateCollision::ATTEMPTS_PARAM_NAME = "max_sampling_attempts";
-}
+}  // namespace default_planner_request_adapters
 
 CLASS_LOADER_REGISTER_CLASS(default_planner_request_adapters::FixStartStateCollision,
                             planning_request_adapter::PlanningRequestAdapter);

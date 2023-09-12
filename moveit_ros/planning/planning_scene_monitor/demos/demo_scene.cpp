@@ -63,6 +63,7 @@ void sendKnife()
   co.id = "knife";
   co.header.stamp = ros::Time::now();
   co.header.frame_id = aco.link_name;
+  co.pose.orientation.w = 1.0;
   co.operation = moveit_msgs::CollisionObject::ADD;
   co.primitives.resize(1);
   co.primitives[0].type = shape_msgs::SolidPrimitive::BOX;
@@ -76,7 +77,7 @@ void sendKnife()
   co.primitive_poses[0].orientation.w = 1.0;
 
   pub_aco.publish(aco);
-  sleep(1);
+  ros::Duration(1).sleep();
   pub_aco.publish(aco);
   ROS_INFO("Object published.");
   ros::Duration(1.5).sleep();

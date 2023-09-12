@@ -34,19 +34,18 @@
 
 /* Author: Ioan Sucan, Acorn Pooley */
 
-#ifndef MOVEIT_PLANNING_SCENE_PLANNING_SCENE_
-#define MOVEIT_PLANNING_SCENE_PLANNING_SCENE_
+#pragma once
 
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/transforms/transforms.h>
 #include <moveit/collision_detection/collision_detector_allocator.h>
 #include <moveit/collision_detection/world_diff.h>
+#include <moveit/collision_detection/collision_env.h>
 #include <moveit/kinematic_constraints/kinematic_constraint.h>
 #include <moveit/kinematics_base/kinematics_base.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/macros/class_forward.h>
-#include <moveit/macros/deprecation.h>
 #include <moveit_msgs/PlanningScene.h>
 #include <moveit_msgs/RobotTrajectory.h>
 #include <moveit_msgs/Constraints.h>
@@ -57,29 +56,113 @@
 #include <boost/concept_check.hpp>
 #include <memory>
 
-/** \brief This namespace includes the central class for representing planning contexts */
+// Import/export for windows dll's and visibility for gcc shared libraries.
+#include <moveit/moveit_planning_scene_export.h>
+
+/**
+\section scene-file-format Format of .scene files
+
+It is possible to read/write a PlanningScene's collision objects from a simple text file (`.scene`).
+The file format is defined as follows:
+\verbatim
+  <FILE>:
+      <ID>  # scene id
+      <OBJECT_DESCRIPTION>*
+      . # single dot indicates end of file
+
+  <OBJECT_DESCRIPTION>:
+      * <ID>  # object id
+      <POSE>   # object pose
+      <NUMBER> # number of shapes in object
+      <SHAPE_DESCRIPTION>*
+      <NUMBER> # number of sub frames
+      <SUBFRAME_DESCRIPTION>*
+
+  <SHAPE_DESCRIPTION>:
+      <BOX> | <CONE> | <CYLINDER> | <SPHERE> | <PLANE> | <MESH>
+      <POSE>   # shape pose w.r.t. object's pose
+      <COLOR>  # common color for all shapes
+
+  <SUBFRAME_DESCRIPTION>:
+      <ID>  # sub frame id
+      <POSE>
+
+  <BOX>:
+      box
+      <FLOAT> <FLOAT> <FLOAT>  # box dimensions: x y z
+
+  <CONE>:
+      cone
+      <FLOAT> <FLOAT>  # radius height
+
+  <CYLINDER>:
+      cylinder
+      <FLOAT> <FLOAT>  # radius height
+
+  <SPHERE>:
+      sphere
+      <FLOAT>  # radius
+
+  <PLANE>:
+      plane
+      <FLOAT> <FLOAT> <FLOAT> <FLOAT>  # plane parameters: a b c d for a*x + b*y +c*z = d
+
+  <ID>: any text
+
+  <POSE>:
+      <FLOAT> <FLOAT> <FLOAT>  # position: x y z
+      <FLOAT> <FLOAT> <FLOAT> <FLOAT>  # quaternion: x y z w
+
+  <COLOR>:
+      <FLOAT> <FLOAT> <FLOAT> <FLOAT>  # R G B A
+\endverbatim
+
+   Here is an example:
+\verbatim
+My PlanningScene
+* object
+0 1.0 0
+0 0 0 1
+2
+box
+0.1 0.2 0.3
+0 1.0 0
+0 0 0 1
+1 0 0 0.5
+cylinder
+0.1 0.5
+0.5 0 0
+0 0 0 1
+0 0 1 0.5
+0
+.
+\endverbatim
+*/
+
+/** \brief This namespace includes the central class for representing planning scenes */
 namespace planning_scene
 {
-MOVEIT_CLASS_FORWARD(PlanningScene);
+MOVEIT_CLASS_FORWARD(PlanningScene);  // Defines PlanningScenePtr, ConstPtr, WeakPtr... etc
 
 /** \brief This is the function signature for additional feasibility checks to be imposed on states (in addition to
    respecting constraints and collision avoidance).
     The first argument is the state to check the feasibility for, the second one is whether the check should be verbose
    or not. */
-typedef boost::function<bool(const robot_state::RobotState&, bool)> StateFeasibilityFn;
+typedef boost::function<bool(const moveit::core::RobotState&, bool)> StateFeasibilityFn;
 
 /** \brief This is the function signature for additional feasibility checks to be imposed on motions segments between
    states (in addition to respecting constraints and collision avoidance).
     The order of the arguments matters: the notion of feasibility is to be checked for motion segments that start at the
    first state and end at the second state. The third argument indicates
     whether the check should be verbose or not. */
-typedef boost::function<bool(const robot_state::RobotState&, const robot_state::RobotState&, bool)> MotionFeasibilityFn;
+using MotionFeasibilityFn =
+    boost::function<bool(const moveit::core::RobotState&, const moveit::core::RobotState&, bool)>;
 
 /** \brief A map from object names (e.g., attached bodies, collision objects) to their colors */
-typedef std::map<std::string, std_msgs::ColorRGBA> ObjectColorMap;
+using ObjectColorMap = std::map<std::string, std_msgs::ColorRGBA>;
 
 /** \brief A map from object names (e.g., attached bodies, collision objects) to their types */
-typedef std::map<std::string, object_recognition_msgs::ObjectType> ObjectTypeMap;
+using ObjectTypeMap = std::map<std::string, object_recognition_msgs::ObjectType>;
 
 /** \brief This class maintains the representation of the
     environment as seen by a planning instance. The environment
@@ -88,16 +171,16 @@ class PlanningScene : private boost::noncopyable, public std::enable_shared_from
 {
 public:
   /** \brief construct using an existing RobotModel */
-  PlanningScene(const robot_model::RobotModelConstPtr& robot_model,
-                collision_detection::WorldPtr world = collision_detection::WorldPtr(new collision_detection::World()));
+  PlanningScene(const moveit::core::RobotModelConstPtr& robot_model,
+                const collision_detection::WorldPtr& world = std::make_shared<collision_detection::World>());
 
   /** \brief construct using a urdf and srdf.
    * A RobotModel for the PlanningScene will be created using the urdf and srdf. */
   PlanningScene(const urdf::ModelInterfaceSharedPtr& urdf_model, const srdf::ModelConstSharedPtr& srdf_model,
-                collision_detection::WorldPtr world = collision_detection::WorldPtr(new collision_detection::World()));
+                const collision_detection::WorldPtr& world = std::make_shared<collision_detection::World>());
 
-  static const std::string OCTOMAP_NS;
-  static const std::string DEFAULT_SCENE_NAME;
+  static MOVEIT_PLANNING_SCENE_EXPORT const std::string OCTOMAP_NS;
+  static MOVEIT_PLANNING_SCENE_EXPORT const std::string DEFAULT_SCENE_NAME;
 
   ~PlanningScene();
 
@@ -118,12 +201,10 @@ public:
    *  The child scene has its own copy of the world. It maintains a list (in
    *  world_diff_) of changes made to the child world.
    *
-   *  The kmodel_, kstate_, ftf_, and acm_ are not copied.  They are shared
-   *  with the parent.  So if changes to these are made in the parent they will
-   *  be visible in the child.  But if any of these is modified (i.e. if the
-   *  get*NonConst functions are called) in the child then a copy is made and
-   *  subsequent changes to the corresponding member of the parent will no
-   *  longer be visible in the child.
+   *  The robot_model_, robot_state_, scene_transforms_, and acm_ are not copied.
+   *  They are shared with the parent.  So if changes to these are made in the parent they will be visible in the child.
+   * But if any of these is modified (i.e. if the get*NonConst functions are called) in the child then a copy is made
+   * and subsequent changes to the corresponding member of the parent will no longer be visible in the child.
    */
   PlanningScenePtr diff() const;
 
@@ -138,23 +219,23 @@ public:
   }
 
   /** \brief Get the kinematic model for which the planning scene is maintained */
-  const robot_model::RobotModelConstPtr& getRobotModel() const
+  const moveit::core::RobotModelConstPtr& getRobotModel() const
   {
     // the kinematic model does not change
-    return kmodel_;
+    return robot_model_;
   }
 
   /** \brief Get the state at which the robot is assumed to be. */
-  const robot_state::RobotState& getCurrentState() const
+  const moveit::core::RobotState& getCurrentState() const
   {
     // if we have an updated state, return it; otherwise, return the parent one
-    return kstate_ ? *kstate_ : parent_->getCurrentState();
+    return robot_state_ ? *robot_state_ : parent_->getCurrentState();
   }
   /** \brief Get the state at which the robot is assumed to be. */
-  robot_state::RobotState& getCurrentStateNonConst();
+  moveit::core::RobotState& getCurrentStateNonConst();
 
   /** \brief Get a copy of the current state with components overwritten by the state message \e update */
-  robot_state::RobotStatePtr getCurrentStateUpdated(const moveit_msgs::RobotState& update) const;
+  moveit::core::RobotStatePtr getCurrentStateUpdated(const moveit_msgs::RobotState& update) const;
 
   /**
    * \name Reasoning about frames
@@ -165,52 +246,57 @@ public:
   const std::string& getPlanningFrame() const
   {
     // if we have an updated set of transforms, return it; otherwise, return the parent one
-    return ftf_ ? ftf_->getTargetFrame() : parent_->getPlanningFrame();
+    return scene_transforms_ ? scene_transforms_->getTargetFrame() : parent_->getPlanningFrame();
   }
 
   /** \brief Get the set of fixed transforms from known frames to the planning frame */
-  const robot_state::Transforms& getTransforms() const
+  const moveit::core::Transforms& getTransforms() const
   {
-    // if we have updated transforms, return those
-    return (ftf_ || !parent_) ? *ftf_ : parent_->getTransforms();
+    if (scene_transforms_ || !parent_)
+    {
+      return *scene_transforms_;
+    }
+
+    // if this planning scene is a child of another, and doesn't have its own custom transforms
+    return parent_->getTransforms();
   }
 
   /** \brief Get the set of fixed transforms from known frames to the planning frame. This variant is non-const and also
    * updates the current state */
-  const robot_state::Transforms& getTransforms();
+  const moveit::core::Transforms& getTransforms();
 
   /** \brief Get the set of fixed transforms from known frames to the planning frame */
-  robot_state::Transforms& getTransformsNonConst();
+  moveit::core::Transforms& getTransformsNonConst();
 
   /** \brief Get the transform corresponding to the frame \e id. This will be known if \e id is a link name, an attached
      body id or a collision object.
       Return identity when no transform is available. Use knowsFrameTransform() to test if this function will be
      successful or not. */
-  const Eigen::Affine3d& getFrameTransform(const std::string& id) const;
+  const Eigen::Isometry3d& getFrameTransform(const std::string& id) const;
 
   /** \brief Get the transform corresponding to the frame \e id. This will be known if \e id is a link name, an attached
      body id or a collision object.
       Return identity when no transform is available. Use knowsFrameTransform() to test if this function will be
      successful or not.
       Because this function is non-const, the current state transforms are also updated, if needed. */
-  const Eigen::Affine3d& getFrameTransform(const std::string& id);
+  const Eigen::Isometry3d& getFrameTransform(const std::string& id);
 
   /** \brief Get the transform corresponding to the frame \e id. This will be known if \e id is a link name, an attached
      body id or a collision object.
       Return identity when no transform is available. Use knowsFrameTransform() to test if this function will be
      successful or not. This function also
       updates the link transforms of \e state. */
-  const Eigen::Affine3d& getFrameTransform(robot_state::RobotState& state, const std::string& id) const
+  const Eigen::Isometry3d& getFrameTransform(moveit::core::RobotState& state, const std::string& id) const
   {
     state.updateLinkTransforms();
-    return getFrameTransform(static_cast<const robot_state::RobotState&>(state), id);
+    return getFrameTransform(static_cast<const moveit::core::RobotState&>(state), id);
   }
 
   /** \brief Get the transform corresponding to the frame \e id. This will be known if \e id is a link name, an attached
      body id or a collision object.
       Return identity when no transform is available. Use knowsFrameTransform() to test if this function will be
      successful or not. */
-  const Eigen::Affine3d& getFrameTransform(const robot_state::RobotState& state, const std::string& id) const;
+  const Eigen::Isometry3d& getFrameTransform(const moveit::core::RobotState& state, const std::string& id) const;
 
   /** \brief Check if a transform to the frame \e id is known. This will be known if \e id is a link name, an attached
    * body id or a collision object */
@@ -218,7 +304,7 @@ public:
 
   /** \brief Check if a transform to the frame \e id is known. This will be known if \e id is a link name, an attached
    * body id or a collision object */
-  bool knowsFrameTransform(const robot_state::RobotState& state, const std::string& id) const;
+  bool knowsFrameTransform(const moveit::core::RobotState& state, const std::string& id) const;
 
   /**@}*/
 
@@ -289,43 +375,31 @@ public:
     return world_;
   }
 
-  /** \brief Get the active collision detector for the world */
-  const collision_detection::CollisionWorldConstPtr& getCollisionWorld() const
+  /** \brief Get the active collision environment */
+  const collision_detection::CollisionEnvConstPtr& getCollisionEnv() const
   {
-    // we always have a world representation after configure is called.
-    return active_collision_->cworld_const_;
+    return active_collision_->getCollisionEnv();
   }
 
   /** \brief Get the active collision detector for the robot */
-  const collision_detection::CollisionRobotConstPtr& getCollisionRobot() const
+  const collision_detection::CollisionEnvConstPtr& getCollisionEnvUnpadded() const
   {
-    return active_collision_->getCollisionRobot();
-  }
-
-  /** \brief Get the active collision detector for the robot */
-  const collision_detection::CollisionRobotConstPtr& getCollisionRobotUnpadded() const
-  {
-    return active_collision_->getCollisionRobotUnpadded();
+    return active_collision_->getCollisionEnvUnpadded();
   }
 
   /** \brief Get a specific collision detector for the world.  If not found return active CollisionWorld. */
-  const collision_detection::CollisionWorldConstPtr&
-  getCollisionWorld(const std::string& collision_detector_name) const;
-
-  /** \brief Get a specific collision detector for the padded robot.  If no found return active CollisionRobot. */
-  const collision_detection::CollisionRobotConstPtr&
-  getCollisionRobot(const std::string& collision_detector_name) const;
+  const collision_detection::CollisionEnvConstPtr& getCollisionEnv(const std::string& collision_detector_name) const;
 
   /** \brief Get a specific collision detector for the unpadded robot.  If no found return active unpadded
    * CollisionRobot. */
-  const collision_detection::CollisionRobotConstPtr&
-  getCollisionRobotUnpadded(const std::string& collision_detector_name) const;
+  const collision_detection::CollisionEnvConstPtr&
+  getCollisionEnvUnpadded(const std::string& collision_detector_name) const;
 
   /** \brief Get the representation of the collision robot
    * This can be used to set padding and link scale on the active collision_robot.
    * NOTE: After modifying padding and scale on the active robot call
    * propogateRobotPadding() to copy it to all the other collision detectors. */
-  const collision_detection::CollisionRobotPtr& getCollisionRobotNonConst();
+  const collision_detection::CollisionEnvPtr& getCollisionEnvNonConst();
 
   /** \brief Copy scale and padding from active CollisionRobot to other CollisionRobots.
    * This should be called after any changes are made to the scale or padding of the active
@@ -364,22 +438,21 @@ public:
      specified,
       collision checking is done for that group only. The link transforms for \e state are updated before the collision
      check. */
-  bool isStateColliding(robot_state::RobotState& state, const std::string& group = "", bool verbose = false) const
+  bool isStateColliding(moveit::core::RobotState& state, const std::string& group = "", bool verbose = false) const
   {
     state.updateCollisionBodyTransforms();
-    return isStateColliding(static_cast<const robot_state::RobotState&>(state), group, verbose);
+    return isStateColliding(static_cast<const moveit::core::RobotState&>(state), group, verbose);
   }
 
   /** \brief Check if a given state is in collision (with the environment or self collision)
       If a group name is specified, collision checking is done for that group only. It is expected that the link
       transforms of \e state are up to date. */
-  bool isStateColliding(const robot_state::RobotState& state, const std::string& group = "",
+  bool isStateColliding(const moveit::core::RobotState& state, const std::string& group = "",
                         bool verbose = false) const;
 
   /** \brief Check if a given state is in collision (with the environment or self collision)
       If a group name is specified, collision checking is done for that group only. */
-  bool isStateColliding(const moveit_msgs::RobotState& state, const std::string& group = "",
-                        bool verbose = false) const;
+  bool isStateColliding(const moveit_msgs::RobotState& state, const std::string& group = "", bool verbose = false) const;
 
   /** \brief Check whether the current state is in collision, and if needed, updates the collision transforms of the
    * current state before the computation. */
@@ -391,34 +464,36 @@ public:
     checkCollision(req, res, getCurrentState());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision. This variant of the function takes
-      a non-const \e kstate and calls updateCollisionBodyTransforms() on it. */
+  /** \brief Check whether a specified state (\e robot_state) is in collision. This variant of the function takes
+      a non-const \e robot_state and calls updateCollisionBodyTransforms() on it. */
   void checkCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                      robot_state::RobotState& kstate) const
+                      moveit::core::RobotState& robot_state) const
   {
-    kstate.updateCollisionBodyTransforms();
-    checkCollision(req, res, static_cast<const robot_state::RobotState&>(kstate));
+    robot_state.updateCollisionBodyTransforms();
+    checkCollision(req, res, static_cast<const moveit::core::RobotState&>(robot_state));
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision. The collision transforms of \e kstate are
+  /** \brief Check whether a specified state (\e robot_state) is in collision. The collision transforms of \e
+   * robot_state are
    * expected to be up to date. */
   void checkCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                      const robot_state::RobotState& kstate) const;
+                      const moveit::core::RobotState& robot_state) const;
 
-  /** \brief Check whether a specified state (\e kstate) is in collision, with respect to a given
+  /** \brief Check whether a specified state (\e robot_state) is in collision, with respect to a given
       allowed collision matrix (\e acm). This variant of the function takes
-      a non-const \e kstate and updates its link transforms if needed. */
+      a non-const \e robot_state and updates its link transforms if needed. */
   void checkCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                      robot_state::RobotState& kstate, const collision_detection::AllowedCollisionMatrix& acm) const
+                      moveit::core::RobotState& robot_state,
+                      const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    kstate.updateCollisionBodyTransforms();
-    checkCollision(req, res, static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    checkCollision(req, res, static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision, with respect to a given
+  /** \brief Check whether a specified state (\e robot_state) is in collision, with respect to a given
       allowed collision matrix (\e acm). */
   void checkCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                      const robot_state::RobotState& kstate,
+                      const moveit::core::RobotState& robot_state,
                       const collision_detection::AllowedCollisionMatrix& acm) const;
 
   /** \brief Check whether the current state is in collision,
@@ -435,39 +510,41 @@ public:
     checkCollisionUnpadded(req, res, getCurrentState(), getAllowedCollisionMatrix());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision,
+  /** \brief Check whether a specified state (\e robot_state) is in collision,
       but use a collision_detection::CollisionRobot instance that has no padding.  */
   void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
-                              collision_detection::CollisionResult& res, const robot_state::RobotState& kstate) const
+                              collision_detection::CollisionResult& res,
+                              const moveit::core::RobotState& robot_state) const
   {
-    checkCollisionUnpadded(req, res, kstate, getAllowedCollisionMatrix());
+    checkCollisionUnpadded(req, res, robot_state, getAllowedCollisionMatrix());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision,
+  /** \brief Check whether a specified state (\e robot_state) is in collision,
       but use a collision_detection::CollisionRobot instance that has no padding.
-      Update the link transforms of \e kstate if needed. */
+      Update the link transforms of \e robot_state if needed. */
   void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
-                              collision_detection::CollisionResult& res, robot_state::RobotState& kstate) const
+                              collision_detection::CollisionResult& res, moveit::core::RobotState& robot_state) const
   {
-    kstate.updateCollisionBodyTransforms();
-    checkCollisionUnpadded(req, res, static_cast<const robot_state::RobotState&>(kstate), getAllowedCollisionMatrix());
+    robot_state.updateCollisionBodyTransforms();
+    checkCollisionUnpadded(req, res, static_cast<const moveit::core::RobotState&>(robot_state),
+                           getAllowedCollisionMatrix());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision, with respect to a given
+  /** \brief Check whether a specified state (\e robot_state) is in collision, with respect to a given
       allowed collision matrix (\e acm), but use a collision_detection::CollisionRobot instance that has no padding.
-      This variant of the function takes a non-const \e kstate and calls updates the link transforms if needed. */
+      This variant of the function takes a non-const \e robot_state and calls updates the link transforms if needed. */
   void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
-                              collision_detection::CollisionResult& res, robot_state::RobotState& kstate,
+                              collision_detection::CollisionResult& res, moveit::core::RobotState& robot_state,
                               const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    kstate.updateCollisionBodyTransforms();
-    checkCollisionUnpadded(req, res, static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    checkCollisionUnpadded(req, res, static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in collision, with respect to a given
+  /** \brief Check whether a specified state (\e robot_state) is in collision, with respect to a given
       allowed collision matrix (\e acm), but use a collision_detection::CollisionRobot instance that has no padding.  */
   void checkCollisionUnpadded(const collision_detection::CollisionRequest& req,
-                              collision_detection::CollisionResult& res, const robot_state::RobotState& kstate,
+                              collision_detection::CollisionResult& res, const moveit::core::RobotState& robot_state,
                               const collision_detection::AllowedCollisionMatrix& acm) const;
 
   /** \brief Check whether the current state is in self collision */
@@ -480,39 +557,40 @@ public:
     checkSelfCollision(req, res, getCurrentState());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in self collision */
+  /** \brief Check whether a specified state (\e robot_state) is in self collision */
   void checkSelfCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                          robot_state::RobotState& kstate) const
+                          moveit::core::RobotState& robot_state) const
   {
-    kstate.updateCollisionBodyTransforms();
-    checkSelfCollision(req, res, static_cast<const robot_state::RobotState&>(kstate), getAllowedCollisionMatrix());
+    robot_state.updateCollisionBodyTransforms();
+    checkSelfCollision(req, res, static_cast<const moveit::core::RobotState&>(robot_state), getAllowedCollisionMatrix());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in self collision */
+  /** \brief Check whether a specified state (\e robot_state) is in self collision */
   void checkSelfCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                          const robot_state::RobotState& kstate) const
+                          const moveit::core::RobotState& robot_state) const
   {
     // do self-collision checking with the unpadded version of the robot
-    getCollisionRobotUnpadded()->checkSelfCollision(req, res, kstate, getAllowedCollisionMatrix());
+    getCollisionEnvUnpadded()->checkSelfCollision(req, res, robot_state, getAllowedCollisionMatrix());
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in self collision, with respect to a given
-      allowed collision matrix (\e acm). The link transforms of \e kstate are updated if needed. */
+  /** \brief Check whether a specified state (\e robot_state) is in self collision, with respect to a given
+      allowed collision matrix (\e acm). The link transforms of \e robot_state are updated if needed. */
   void checkSelfCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                          robot_state::RobotState& kstate, const collision_detection::AllowedCollisionMatrix& acm) const
+                          moveit::core::RobotState& robot_state,
+                          const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    kstate.updateCollisionBodyTransforms();
-    checkSelfCollision(req, res, static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    checkSelfCollision(req, res, static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
-  /** \brief Check whether a specified state (\e kstate) is in self collision, with respect to a given
+  /** \brief Check whether a specified state (\e robot_state) is in self collision, with respect to a given
       allowed collision matrix (\e acm) */
   void checkSelfCollision(const collision_detection::CollisionRequest& req, collision_detection::CollisionResult& res,
-                          const robot_state::RobotState& kstate,
+                          const moveit::core::RobotState& robot_state,
                           const collision_detection::AllowedCollisionMatrix& acm) const
   {
     // do self-collision checking with the unpadded version of the robot
-    getCollisionRobotUnpadded()->checkSelfCollision(req, res, kstate, acm);
+    getCollisionEnvUnpadded()->checkSelfCollision(req, res, robot_state, acm);
   }
 
   /** \brief Get the names of the links that are involved in collisions for the current state */
@@ -524,32 +602,32 @@ public:
     getCollidingLinks(links, getCurrentState(), getAllowedCollisionMatrix());
   }
 
-  /** \brief Get the names of the links that are involved in collisions for the state \e kstate.
-      Update the link transforms for \e kstate if needed. */
-  void getCollidingLinks(std::vector<std::string>& links, robot_state::RobotState& kstate) const
+  /** \brief Get the names of the links that are involved in collisions for the state \e robot_state.
+      Update the link transforms for \e robot_state if needed. */
+  void getCollidingLinks(std::vector<std::string>& links, moveit::core::RobotState& robot_state) const
   {
-    kstate.updateCollisionBodyTransforms();
-    getCollidingLinks(links, static_cast<const robot_state::RobotState&>(kstate), getAllowedCollisionMatrix());
+    robot_state.updateCollisionBodyTransforms();
+    getCollidingLinks(links, static_cast<const moveit::core::RobotState&>(robot_state), getAllowedCollisionMatrix());
   }
 
-  /** \brief Get the names of the links that are involved in collisions for the state \e kstate */
-  void getCollidingLinks(std::vector<std::string>& links, const robot_state::RobotState& kstate) const
+  /** \brief Get the names of the links that are involved in collisions for the state \e robot_state */
+  void getCollidingLinks(std::vector<std::string>& links, const moveit::core::RobotState& robot_state) const
   {
-    getCollidingLinks(links, kstate, getAllowedCollisionMatrix());
+    getCollidingLinks(links, robot_state, getAllowedCollisionMatrix());
   }
 
-  /** \brief  Get the names of the links that are involved in collisions for the state \e kstate given the
+  /** \brief  Get the names of the links that are involved in collisions for the state \e robot_state given the
       allowed collision matrix (\e acm) */
-  void getCollidingLinks(std::vector<std::string>& links, robot_state::RobotState& kstate,
+  void getCollidingLinks(std::vector<std::string>& links, moveit::core::RobotState& robot_state,
                          const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    kstate.updateCollisionBodyTransforms();
-    getCollidingLinks(links, static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    getCollidingLinks(links, static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
-  /** \brief  Get the names of the links that are involved in collisions for the state \e kstate given the
+  /** \brief  Get the names of the links that are involved in collisions for the state \e robot_state given the
       allowed collision matrix (\e acm) */
-  void getCollidingLinks(std::vector<std::string>& links, const robot_state::RobotState& kstate,
+  void getCollidingLinks(std::vector<std::string>& links, const moveit::core::RobotState& robot_state,
                          const collision_detection::AllowedCollisionMatrix& acm) const;
 
   /** \brief Get the names of the links that are involved in collisions for the current state.
@@ -562,36 +640,42 @@ public:
     getCollidingPairs(contacts, getCurrentState(), getAllowedCollisionMatrix());
   }
 
-  /** \brief Get the names of the links that are involved in collisions for the state \e kstate */
+  /** \brief Get the names of the links that are involved in collisions for the state \e robot_state.
+   *  Can be restricted to links part of or updated by \e group_name */
   void getCollidingPairs(collision_detection::CollisionResult::ContactMap& contacts,
-                         const robot_state::RobotState& kstate) const
+                         const moveit::core::RobotState& robot_state, const std::string& group_name = "") const
   {
-    getCollidingPairs(contacts, kstate, getAllowedCollisionMatrix());
+    getCollidingPairs(contacts, robot_state, getAllowedCollisionMatrix(), group_name);
   }
 
-  /** \brief Get the names of the links that are involved in collisions for the state \e kstate.
-      Update the link transforms for \e kstate if needed. */
+  /** \brief Get the names of the links that are involved in collisions for the state \e robot_state.
+      Update the link transforms for \e robot_state if needed.
+      Can be restricted to links part of or updated by \e group_name */
   void getCollidingPairs(collision_detection::CollisionResult::ContactMap& contacts,
-                         robot_state::RobotState& kstate) const
+                         moveit::core::RobotState& robot_state, const std::string& group_name = "") const
   {
-    kstate.updateCollisionBodyTransforms();
-    getCollidingPairs(contacts, static_cast<const robot_state::RobotState&>(kstate), getAllowedCollisionMatrix());
+    robot_state.updateCollisionBodyTransforms();
+    getCollidingPairs(contacts, static_cast<const moveit::core::RobotState&>(robot_state), getAllowedCollisionMatrix(),
+                      group_name);
   }
 
-  /** \brief  Get the names of the links that are involved in collisions for the state \e kstate given the
-      allowed collision matrix (\e acm). Update the link transforms for \e kstate if needed. */
-  void getCollidingPairs(collision_detection::CollisionResult::ContactMap& contacts, robot_state::RobotState& kstate,
-                         const collision_detection::AllowedCollisionMatrix& acm) const
+  /** \brief  Get the names of the links that are involved in collisions for the state \e robot_state given the
+      allowed collision matrix (\e acm). Update the link transforms for \e robot_state if needed.
+      Can be restricted to links part of or updated by \e group_name*/
+  void getCollidingPairs(collision_detection::CollisionResult::ContactMap& contacts,
+                         moveit::core::RobotState& robot_state, const collision_detection::AllowedCollisionMatrix& acm,
+                         const std::string& group_name = "") const
   {
-    kstate.updateCollisionBodyTransforms();
-    getCollidingPairs(contacts, static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    getCollidingPairs(contacts, static_cast<const moveit::core::RobotState&>(robot_state), acm, group_name);
   }
 
-  /** \brief  Get the names of the links that are involved in collisions for the state \e kstate given the
-      allowed collision matrix (\e acm) */
+  /** \brief  Get the names of the links that are involved in collisions for the state \e robot_state given the
+      allowed collision matrix (\e acm). Can be restricted to links part of or updated by \e group_name */
   void getCollidingPairs(collision_detection::CollisionResult::ContactMap& contacts,
-                         const robot_state::RobotState& kstate,
-                         const collision_detection::AllowedCollisionMatrix& acm) const;
+                         const moveit::core::RobotState& robot_state,
+                         const collision_detection::AllowedCollisionMatrix& acm,
+                         const std::string& group_name = "") const;
 
   /**@}*/
 
@@ -600,80 +684,89 @@ public:
    */
   /**@{*/
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision (ignoring self-collisions)
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision (ignoring
+   * self-collisions)
    */
-  double distanceToCollision(robot_state::RobotState& kstate) const
+  double distanceToCollision(moveit::core::RobotState& robot_state) const
   {
-    kstate.updateCollisionBodyTransforms();
-    return distanceToCollision(static_cast<const robot_state::RobotState&>(kstate));
+    robot_state.updateCollisionBodyTransforms();
+    return distanceToCollision(static_cast<const moveit::core::RobotState&>(robot_state));
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision (ignoring self-collisions)
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision (ignoring
+   * self-collisions)
    */
-  double distanceToCollision(const robot_state::RobotState& kstate) const
+  double distanceToCollision(const moveit::core::RobotState& robot_state) const
   {
-    return getCollisionWorld()->distanceRobot(*getCollisionRobot(), kstate, getAllowedCollisionMatrix());
+    return getCollisionEnv()->distanceRobot(robot_state, getAllowedCollisionMatrix());
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision (ignoring
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision (ignoring
    * self-collisions), if the robot has no padding */
-  double distanceToCollisionUnpadded(robot_state::RobotState& kstate) const
+  double distanceToCollisionUnpadded(moveit::core::RobotState& robot_state) const
   {
-    kstate.updateCollisionBodyTransforms();
-    return distanceToCollisionUnpadded(static_cast<const robot_state::RobotState&>(kstate));
+    robot_state.updateCollisionBodyTransforms();
+    return distanceToCollisionUnpadded(static_cast<const moveit::core::RobotState&>(robot_state));
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision (ignoring
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision (ignoring
    * self-collisions), if the robot has no padding */
-  double distanceToCollisionUnpadded(const robot_state::RobotState& kstate) const
+  double distanceToCollisionUnpadded(const moveit::core::RobotState& robot_state) const
   {
-    return getCollisionWorld()->distanceRobot(*getCollisionRobotUnpadded(), kstate, getAllowedCollisionMatrix());
+    return getCollisionEnvUnpadded()->distanceRobot(robot_state, getAllowedCollisionMatrix());
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision, ignoring self-collisions
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision, ignoring
+   * self-collisions
    * and elements that are allowed to collide. */
-  double distanceToCollision(robot_state::RobotState& kstate,
+  double distanceToCollision(moveit::core::RobotState& robot_state,
                              const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    kstate.updateCollisionBodyTransforms();
-    return distanceToCollision(static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    return distanceToCollision(static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision, ignoring self-collisions
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision, ignoring
+   * self-collisions
    * and elements that are allowed to collide. */
-  double distanceToCollision(const robot_state::RobotState& kstate,
+  double distanceToCollision(const moveit::core::RobotState& robot_state,
                              const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    return getCollisionWorld()->distanceRobot(*getCollisionRobot(), kstate, acm);
+    return getCollisionEnv()->distanceRobot(robot_state, acm);
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision, ignoring self-collisions
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision, ignoring
+   * self-collisions
    * and elements that are allowed to collide, if the robot has no padding. */
-  double distanceToCollisionUnpadded(robot_state::RobotState& kstate,
+  double distanceToCollisionUnpadded(moveit::core::RobotState& robot_state,
                                      const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    kstate.updateCollisionBodyTransforms();
-    return distanceToCollisionUnpadded(static_cast<const robot_state::RobotState&>(kstate), acm);
+    robot_state.updateCollisionBodyTransforms();
+    return distanceToCollisionUnpadded(static_cast<const moveit::core::RobotState&>(robot_state), acm);
   }
 
-  /** \brief The distance between the robot model at state \e kstate to the nearest collision, ignoring self-collisions
+  /** \brief The distance between the robot model at state \e robot_state to the nearest collision, ignoring
+   * self-collisions
    * and elements that always allowed to collide, if the robot has no padding. */
-  double distanceToCollisionUnpadded(const robot_state::RobotState& kstate,
+  double distanceToCollisionUnpadded(const moveit::core::RobotState& robot_state,
                                      const collision_detection::AllowedCollisionMatrix& acm) const
   {
-    return getCollisionWorld()->distanceRobot(*getCollisionRobotUnpadded(), kstate, acm);
+    return getCollisionEnvUnpadded()->distanceRobot(robot_state, acm);
   }
 
   /**@}*/
 
-  /** \brief Save the geometry of the planning scene to a stream, as plain text */
+  /** \brief Save the geometry of the planning scene to a stream, as plain text
+
+   The .scene file format allows simple saving/loading of PlanningScene collision objects (see \ref scene-file-format)
+  */
   void saveGeometryToStream(std::ostream& out) const;
 
   /** \brief Load the geometry of the planning scene from a stream */
-  void loadGeometryFromStream(std::istream& in);
+  bool loadGeometryFromStream(std::istream& in);
 
   /** \brief Load the geometry of the planning scene from a stream at a certain location using offset*/
-  void loadGeometryFromStream(std::istream& in, const Eigen::Affine3d& offset);
+  bool loadGeometryFromStream(std::istream& in, const Eigen::Isometry3d& offset);
 
   /** \brief Fill the message \e scene with the differences between this instance of PlanningScene with respect to the
      parent.
@@ -728,6 +821,15 @@ public:
    * is set */
   bool usePlanningSceneMsg(const moveit_msgs::PlanningScene& scene);
 
+  /** \brief Takes the object message and returns the object pose, shapes and shape poses.
+   * If the object pose is empty (identity) but the shape pose is set, this uses the shape
+   * pose as the object pose. The shape pose becomes the identity instead.
+   */
+  bool shapesAndPosesFromCollisionObjectMessage(const moveit_msgs::CollisionObject& object,
+                                                Eigen::Isometry3d& object_pose_in_header_frame,
+                                                std::vector<shapes::ShapeConstPtr>& shapes,
+                                                EigenSTL::vector_Isometry3d& shape_poses);
+
   bool processCollisionObjectMsg(const moveit_msgs::CollisionObject& object);
   bool processAttachedCollisionObjectMsg(const moveit_msgs::AttachedCollisionObject& object);
 
@@ -735,7 +837,7 @@ public:
 
   void processOctomapMsg(const octomap_msgs::OctomapWithPose& map);
   void processOctomapMsg(const octomap_msgs::Octomap& map);
-  void processOctomapPtr(const std::shared_ptr<const octomap::OcTree>& octree, const Eigen::Affine3d& t);
+  void processOctomapPtr(const std::shared_ptr<const octomap::OcTree>& octree, const Eigen::Isometry3d& t);
 
   /**
    * \brief Clear all collision objects in planning scene
@@ -748,10 +850,10 @@ public:
   void setCurrentState(const moveit_msgs::RobotState& state);
 
   /** \brief Set the current robot state */
-  void setCurrentState(const robot_state::RobotState& state);
+  void setCurrentState(const moveit::core::RobotState& state);
 
   /** \brief Set the callback to be triggered when changes are made to the current scene state */
-  void setAttachedBodyUpdateCallback(const robot_state::AttachedBodyCallback& callback);
+  void setAttachedBodyUpdateCallback(const moveit::core::AttachedBodyCallback& callback);
 
   /** \brief Set the callback to be triggered when changes are made to the current scene world */
   void setCollisionObjectUpdateCallback(const collision_detection::World::ObserverCallbackFn& callback);
@@ -770,8 +872,10 @@ public:
   void removeObjectType(const std::string& id);
   void getKnownObjectTypes(ObjectTypeMap& kc) const;
 
-  /** \brief Clear the diffs accumulated for this planning scene, with respect to the parent. This function is a no-op
-   * if there is no parent specified. */
+  /** \brief Clear the diffs accumulated for this planning scene, with respect to:
+   * the parent PlanningScene (if it exists)
+   * the parent CollisionDetector (if it exists)
+   * This function is a no-op if there is no parent planning scene. */
   void clearDiffs();
 
   /** \brief If there is a parent specified for this scene, then the diffs with respect to that parent are applied to a
@@ -819,14 +923,14 @@ public:
 
   /** \brief Check if a given state is feasible, in accordance to the feasibility predicate specified by
    * setStateFeasibilityPredicate(). Returns true if no feasibility predicate was specified. */
-  bool isStateFeasible(const robot_state::RobotState& state, bool verbose = false) const;
+  bool isStateFeasible(const moveit::core::RobotState& state, bool verbose = false) const;
 
   /** \brief Check if a given state satisfies a set of constraints */
   bool isStateConstrained(const moveit_msgs::RobotState& state, const moveit_msgs::Constraints& constr,
                           bool verbose = false) const;
 
   /** \brief Check if a given state satisfies a set of constraints */
-  bool isStateConstrained(const robot_state::RobotState& state, const moveit_msgs::Constraints& constr,
+  bool isStateConstrained(const moveit::core::RobotState& state, const moveit_msgs::Constraints& constr,
                           bool verbose = false) const;
 
   /** \brief Check if a given state satisfies a set of constraints */
@@ -834,14 +938,14 @@ public:
                           const kinematic_constraints::KinematicConstraintSet& constr, bool verbose = false) const;
 
   /** \brief Check if a given state satisfies a set of constraints */
-  bool isStateConstrained(const robot_state::RobotState& state,
+  bool isStateConstrained(const moveit::core::RobotState& state,
                           const kinematic_constraints::KinematicConstraintSet& constr, bool verbose = false) const;
 
   /** \brief Check if a given state is valid. This means checking for collisions and feasibility */
   bool isStateValid(const moveit_msgs::RobotState& state, const std::string& group = "", bool verbose = false) const;
 
   /** \brief Check if a given state is valid. This means checking for collisions and feasibility */
-  bool isStateValid(const robot_state::RobotState& state, const std::string& group = "", bool verbose = false) const;
+  bool isStateValid(const moveit::core::RobotState& state, const std::string& group = "", bool verbose = false) const;
 
   /** \brief Check if a given state is valid. This means checking for collisions, feasibility  and whether the user
    * specified validity conditions hold as well */
@@ -850,25 +954,25 @@ public:
 
   /** \brief Check if a given state is valid. This means checking for collisions, feasibility  and whether the user
    * specified validity conditions hold as well */
-  bool isStateValid(const robot_state::RobotState& state, const moveit_msgs::Constraints& constr,
+  bool isStateValid(const moveit::core::RobotState& state, const moveit_msgs::Constraints& constr,
                     const std::string& group = "", bool verbose = false) const;
 
   /** \brief Check if a given state is valid. This means checking for collisions, feasibility  and whether the user
    * specified validity conditions hold as well */
-  bool isStateValid(const robot_state::RobotState& state, const kinematic_constraints::KinematicConstraintSet& constr,
+  bool isStateValid(const moveit::core::RobotState& state, const kinematic_constraints::KinematicConstraintSet& constr,
                     const std::string& group = "", bool verbose = false) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance and feasibility) */
   bool isPathValid(const moveit_msgs::RobotState& start_state, const moveit_msgs::RobotTrajectory& trajectory,
                    const std::string& group = "", bool verbose = false,
-                   std::vector<std::size_t>* invalid_index = NULL) const;
+                   std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance, feasibility and
    * constraint satisfaction). It is also checked that the goal constraints are satisfied by the last state on the
    * passed in trajectory. */
   bool isPathValid(const moveit_msgs::RobotState& start_state, const moveit_msgs::RobotTrajectory& trajectory,
                    const moveit_msgs::Constraints& path_constraints, const std::string& group = "",
-                   bool verbose = false, std::vector<std::size_t>* invalid_index = NULL) const;
+                   bool verbose = false, std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance, feasibility and
    * constraint satisfaction). It is also checked that the goal constraints are satisfied by the last state on the
@@ -876,7 +980,7 @@ public:
   bool isPathValid(const moveit_msgs::RobotState& start_state, const moveit_msgs::RobotTrajectory& trajectory,
                    const moveit_msgs::Constraints& path_constraints, const moveit_msgs::Constraints& goal_constraints,
                    const std::string& group = "", bool verbose = false,
-                   std::vector<std::size_t>* invalid_index = NULL) const;
+                   std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance, feasibility and
    * constraint satisfaction). It is also checked that the goal constraints are satisfied by the last state on the
@@ -884,7 +988,7 @@ public:
   bool isPathValid(const moveit_msgs::RobotState& start_state, const moveit_msgs::RobotTrajectory& trajectory,
                    const moveit_msgs::Constraints& path_constraints,
                    const std::vector<moveit_msgs::Constraints>& goal_constraints, const std::string& group = "",
-                   bool verbose = false, std::vector<std::size_t>* invalid_index = NULL) const;
+                   bool verbose = false, std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance, feasibility and
    * constraint satisfaction). It is also checked that the goal constraints are satisfied by the last state on the
@@ -892,7 +996,7 @@ public:
   bool isPathValid(const robot_trajectory::RobotTrajectory& trajectory,
                    const moveit_msgs::Constraints& path_constraints,
                    const std::vector<moveit_msgs::Constraints>& goal_constraints, const std::string& group = "",
-                   bool verbose = false, std::vector<std::size_t>* invalid_index = NULL) const;
+                   bool verbose = false, std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance, feasibility and
    * constraint satisfaction). It is also checked that the goal constraints are satisfied by the last state on the
@@ -900,17 +1004,17 @@ public:
   bool isPathValid(const robot_trajectory::RobotTrajectory& trajectory,
                    const moveit_msgs::Constraints& path_constraints, const moveit_msgs::Constraints& goal_constraints,
                    const std::string& group = "", bool verbose = false,
-                   std::vector<std::size_t>* invalid_index = NULL) const;
+                   std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance, feasibility and
    * constraint satisfaction). */
   bool isPathValid(const robot_trajectory::RobotTrajectory& trajectory,
                    const moveit_msgs::Constraints& path_constraints, const std::string& group = "",
-                   bool verbose = false, std::vector<std::size_t>* invalid_index = NULL) const;
+                   bool verbose = false, std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Check if a given path is valid. Each state is checked for validity (collision avoidance and feasibility) */
   bool isPathValid(const robot_trajectory::RobotTrajectory& trajectory, const std::string& group = "",
-                   bool verbose = false, std::vector<std::size_t>* invalid_index = NULL) const;
+                   bool verbose = false, std::vector<std::size_t>* invalid_index = nullptr) const;
 
   /** \brief Get the top \e max_costs cost sources for a specified trajectory. The resulting costs are stored in \e
    * costs */
@@ -924,27 +1028,28 @@ public:
                       double overlap_fraction = 0.9) const;
 
   /** \brief Get the top \e max_costs cost sources for a specified state. The resulting costs are stored in \e costs */
-  void getCostSources(const robot_state::RobotState& state, std::size_t max_costs,
+  void getCostSources(const moveit::core::RobotState& state, std::size_t max_costs,
                       std::set<collision_detection::CostSource>& costs) const;
 
   /** \brief Get the top \e max_costs cost sources for a specified state, but only for group \e group_name. The
    * resulting costs are stored in \e costs */
-  void getCostSources(const robot_state::RobotState& state, std::size_t max_costs, const std::string& group_name,
+  void getCostSources(const moveit::core::RobotState& state, std::size_t max_costs, const std::string& group_name,
                       std::set<collision_detection::CostSource>& costs) const;
 
   /** \brief Outputs debug information about the planning scene contents */
-  void printKnownObjects(std::ostream& out) const;
+  void printKnownObjects(std::ostream& out = std::cout) const;
 
   /** \brief Check if a message includes any information about a planning scene, or it is just a default, empty message.
    */
-  static bool isEmpty(const moveit_msgs::PlanningScene& msg);
+  [[deprecated("Use moveit/utils/message_checks.h instead")]] static bool isEmpty(const moveit_msgs::PlanningScene& msg);
 
   /** \brief Check if a message includes any information about a planning scene world, or it is just a default, empty
    * message. */
-  static bool isEmpty(const moveit_msgs::PlanningSceneWorld& msg);
+  [[deprecated("Use moveit/utils/message_checks.h instead")]] static bool
+  isEmpty(const moveit_msgs::PlanningSceneWorld& msg);
 
   /** \brief Check if a message includes any information about a robot state, or it is just a default, empty message. */
-  static bool isEmpty(const moveit_msgs::RobotState& msg);
+  [[deprecated("Use moveit/utils/message_checks.h instead")]] static bool isEmpty(const moveit_msgs::RobotState& msg);
 
   /** \brief Clone a planning scene. Even if the scene \e scene depends on a parent, the cloned scene will not. */
   static PlanningScenePtr clone(const PlanningSceneConstPtr& scene);
@@ -958,40 +1063,50 @@ private:
   void initialize();
 
   /* helper function to create a RobotModel from a urdf/srdf. */
-  static robot_model::RobotModelPtr createRobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model,
-                                                     const srdf::ModelConstSharedPtr& srdf_model);
+  static moveit::core::RobotModelPtr createRobotModel(const urdf::ModelInterfaceSharedPtr& urdf_model,
+                                                      const srdf::ModelConstSharedPtr& srdf_model);
 
-  MOVEIT_CLASS_FORWARD(CollisionDetector);
+  /* Helper functions for processing collision objects */
+  bool processCollisionObjectAdd(const moveit_msgs::CollisionObject& object);
+  bool processCollisionObjectRemove(const moveit_msgs::CollisionObject& object);
+  bool processCollisionObjectMove(const moveit_msgs::CollisionObject& object);
+
+  /* For exporting and importing the planning scene */
+  bool readPoseFromText(std::istream& in, Eigen::Isometry3d& pose) const;
+  void writePoseToText(std::ostream& out, const Eigen::Isometry3d& pose) const;
+
+  /** convert Pose msg to Eigen::Isometry, normalizing the quaternion part if necessary. */
+  static void poseMsgToEigen(const geometry_msgs::Pose& msg, Eigen::Isometry3d& out);
+
+  MOVEIT_STRUCT_FORWARD(CollisionDetector);
 
   /* \brief A set of compatible collision detectors */
   struct CollisionDetector
   {
     collision_detection::CollisionDetectorAllocatorPtr alloc_;
-    collision_detection::CollisionRobotPtr crobot_unpadded_;  // if NULL use parent's
-    collision_detection::CollisionRobotConstPtr crobot_unpadded_const_;
-    collision_detection::CollisionRobotPtr crobot_;  // if NULL use parent's
-    collision_detection::CollisionRobotConstPtr crobot_const_;
+    collision_detection::CollisionEnvPtr cenv_;  // never NULL
+    collision_detection::CollisionEnvConstPtr cenv_const_;
 
-    collision_detection::CollisionWorldPtr cworld_;  // never NULL
-    collision_detection::CollisionWorldConstPtr cworld_const_;
+    collision_detection::CollisionEnvPtr cenv_unpadded_;
+    collision_detection::CollisionEnvConstPtr cenv_unpadded_const_;
 
     CollisionDetectorConstPtr parent_;  // may be NULL
 
-    const collision_detection::CollisionRobotConstPtr& getCollisionRobot() const
+    const collision_detection::CollisionEnvConstPtr& getCollisionEnv() const
     {
-      return crobot_const_ ? crobot_const_ : parent_->getCollisionRobot();
+      return cenv_const_ ? cenv_const_ : parent_->getCollisionEnv();
     }
-    const collision_detection::CollisionRobotConstPtr& getCollisionRobotUnpadded() const
+    const collision_detection::CollisionEnvConstPtr& getCollisionEnvUnpadded() const
     {
-      return crobot_unpadded_const_ ? crobot_unpadded_const_ : parent_->getCollisionRobotUnpadded();
+      return cenv_unpadded_const_ ? cenv_unpadded_const_ : parent_->getCollisionEnvUnpadded();
     }
     void findParent(const PlanningScene& scene);
     void copyPadding(const CollisionDetector& src);
   };
   friend struct CollisionDetector;
 
-  typedef std::map<std::string, CollisionDetectorPtr>::iterator CollisionDetectorIterator;
-  typedef std::map<std::string, CollisionDetectorPtr>::const_iterator CollisionDetectorConstIterator;
+  using CollisionDetectorIterator = std::map<std::string, CollisionDetectorPtr>::iterator;
+  using CollisionDetectorConstIterator = std::map<std::string, CollisionDetectorPtr>::const_iterator;
 
   void allocateCollisionDetectors();
   void allocateCollisionDetectors(CollisionDetector& detector);
@@ -1000,13 +1115,16 @@ private:
 
   PlanningSceneConstPtr parent_;  // Null unless this is a diff scene
 
-  robot_model::RobotModelConstPtr kmodel_;  // Never null (may point to same model as parent)
+  moveit::core::RobotModelConstPtr robot_model_;  // Never null (may point to same model as parent)
 
-  robot_state::RobotStatePtr kstate_;                                       // if NULL use parent's
-  robot_state::AttachedBodyCallback current_state_attached_body_callback_;  // called when changes are made to attached
-                                                                            // bodies
+  moveit::core::RobotStatePtr robot_state_;  // if NULL use parent's
 
-  robot_state::TransformsPtr ftf_;  // if NULL use parent's
+  // Called when changes are made to attached bodies
+  moveit::core::AttachedBodyCallback current_state_attached_body_callback_;
+
+  // This variable is not necessarily used by child planning scenes
+  // This Transforms class is actually a SceneTransforms class
+  moveit::core::TransformsPtr scene_transforms_;  // if NULL use parent's
 
   collision_detection::WorldPtr world_;             // never NULL, never shared with parent/child
   collision_detection::WorldConstPtr world_const_;  // copy of world_
@@ -1027,6 +1145,4 @@ private:
   // a map of object types
   std::unique_ptr<ObjectTypeMap> object_types_;
 };
-}
-
-#endif
+}  // namespace planning_scene

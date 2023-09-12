@@ -35,13 +35,10 @@
 
 /* Author: Ken Anderson */
 
-#ifndef MOVEIT_TRAJECTORY_PROCESSING_ITERATIVE_SPLINE_PARAMETERIZATION__
-#define MOVEIT_TRAJECTORY_PROCESSING_ITERATIVE_SPLINE_PARAMETERIZATION__
+#pragma once
 
-#include <trajectory_msgs/JointTrajectory.h>
-#include <moveit_msgs/JointLimits.h>
-#include <moveit_msgs/RobotState.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
+#include <moveit/trajectory_processing/time_parameterization.h>
 
 namespace trajectory_processing
 {
@@ -71,19 +68,16 @@ namespace trajectory_processing
 /// velocity and acceleration limits, will result in a longer trajectory.
 /// If this is a problem, try retuning (increasing) the limits.
 ///
-class IterativeSplineParameterization
+class IterativeSplineParameterization : public TimeParameterization
 {
 public:
   IterativeSplineParameterization(bool add_points = true);
-  ~IterativeSplineParameterization();
 
   bool computeTimeStamps(robot_trajectory::RobotTrajectory& trajectory, const double max_velocity_scaling_factor = 1.0,
-                         const double max_acceleration_scaling_factor = 1.0) const;
+                         const double max_acceleration_scaling_factor = 1.0) const override;
 
 private:
   bool add_points_;  /// @brief If true, add two points to trajectory (first and last segments).
                      /// If false, move the 2nd and 2nd-last points.
 };
-}
-
-#endif
+}  // namespace trajectory_processing

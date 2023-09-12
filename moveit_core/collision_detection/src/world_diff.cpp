@@ -35,7 +35,7 @@
 /* Author: Acorn Pooley, Ioan Sucan */
 
 #include <moveit/collision_detection/world_diff.h>
-#include <boost/bind.hpp>
+#include <functional>
 
 namespace collision_detection
 {
@@ -52,7 +52,8 @@ WorldDiff::WorldDiff()
 
 WorldDiff::WorldDiff(const WorldPtr& world) : world_(world)
 {
-  observer_handle_ = world->addObserver(boost::bind(&WorldDiff::notify, this, _1, _2));
+  observer_handle_ =
+      world->addObserver([this](const World::ObjectConstPtr& object, World::Action action) { notify(object, action); });
 }
 
 WorldDiff::WorldDiff(WorldDiff& other)
@@ -62,8 +63,9 @@ WorldDiff::WorldDiff(WorldDiff& other)
   {
     changes_ = other.changes_;
 
-    std::weak_ptr<World>(world).swap(world_);
-    observer_handle_ = world->addObserver(boost::bind(&WorldDiff::notify, this, _1, _2));
+    WorldWeakPtr(world).swap(world_);
+    observer_handle_ = world->addObserver(
+        [this](const World::ObjectConstPtr& object, World::Action action) { notify(object, action); });
   }
 }
 
@@ -86,8 +88,9 @@ void WorldDiff::reset(const WorldPtr& world)
   if (old_world)
     old_world->removeObserver(observer_handle_);
 
-  std::weak_ptr<World>(world).swap(world_);
-  observer_handle_ = world->addObserver(boost::bind(&WorldDiff::notify, this, _1, _2));
+  WorldWeakPtr(world).swap(world_);
+  observer_handle_ =
+      world->addObserver([this](const World::ObjectConstPtr& object, World::Action action) { notify(object, action); });
 }
 
 void WorldDiff::setWorld(const WorldPtr& world)
@@ -99,9 +102,10 @@ void WorldDiff::setWorld(const WorldPtr& world)
     old_world->removeObserver(observer_handle_);
   }
 
-  std::weak_ptr<World>(world).swap(world_);
+  WorldWeakPtr(world).swap(world_);
 
-  observer_handle_ = world->addObserver(boost::bind(&WorldDiff::notify, this, _1, _2));
+  observer_handle_ =
+      world->addObserver([this](const World::ObjectConstPtr& object, World::Action action) { notify(object, action); });
   world->notifyObserverAllObjects(observer_handle_, World::CREATE | World::ADD_SHAPE);
 }
 

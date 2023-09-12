@@ -2,9 +2,253 @@
 Changelog for package moveit_ros_visualization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.9.12 (2018-05-29)
+1.1.13 (2023-07-28)
 -------------------
-* [maintenance] Reduce vertical size of Rviz MotionPlanning Window (`#891 <https://github.com/ros-planning/moveit/issues/891>`_)
+* Avoid costly updates of invisible RobotInteractions on query state changes (`#3478 <https://github.com/ros-planning/moveit/issues/3478>`_)
+* Contributors: Robert Haschke
+
+1.1.12 (2023-05-13)
+-------------------
+* MPD: Resolve namespace ambiguity in RobotInteraction (`#3403 <https://github.com/ros-planning/moveit/issues/3403>`_)
+* Disallow custom string for planning group property in RViz Display (`#3346 <https://github.com/ros-planning/moveit/issues/3346>`_)
+* Fixes to octomap display in PSD (`#3385 <https://github.com/ros-planning/moveit/issues/3385>`_)
+* MPD: maintain current item when updating object list
+* TrajectoryDisplay: sync visibility of links in trail with main robot (`#3337 <https://github.com/ros-planning/moveit/issues/3337>`_)
+* Contributors: Robert Haschke, Simon Schmeisser, Tejal Ashwini Barnwal
+
+1.1.11 (2022-12-21)
+-------------------
+* Fix some consistency issues in PlanningScene handling (`#3298 <https://github.com/ros-planning/moveit/issues/3298>`_)
+
+  * Allow Plane collision-object creation from rviz
+  * Simplify Cone rendering
+  * Visualize PLANE shapes as a large, thin box
+* Merge fixes+improvements to ``PlanningScene`` editing in rviz: `#3263 <https://github.com/ros-planning/moveit/issues/3263>`_, `#3264 <https://github.com/ros-planning/moveit/issues/3264>`_, `#3296 <https://github.com/ros-planning/moveit/issues/3296>`_
+
+  * Fix error "QBackingStore::endPaint() called with active painter"
+  * Remove limitation to one-shape collision objects
+  * Fix segfault on object scaling: only update a _valid_ scene marker
+  * JointsWidget: Copy full RobotState on updates (attached collision objects were missing)
+  * Factor out ``addCollisionObjectToList()`` from ``populateCollisionObjectsList()``
+  * Simplify ``MotionPlanningFrame::addSceneObject``
+  * Directly call ``populateCollisionObjectsList()`` if possible
+
+    Calling was previously deferred into a main loop job, because most
+    callers already held a PlanningScene lock, thus causing recursive locking and a deadlock.
+    By simply passing the locked scene, these issues can be avoided.
+    As a fallback, the PlanningScene lock is still acquired in the function.
+  * ``updateQueryStates()`` after removal of attached objects
+  * Clear scene objects: only clear locally. To publish changes, one should explicitly click the "Publish" button.
+  * Scene Object List: allow extended selection mode
+  * always update query states - even if they are disabled for visualization
+  * only allow execution if start state is up-to-date
+* Merge PR `#3227 <https://github.com/ros-planning/moveit/issues/3227>`_: Improve MotionPlanning plugin's JointsWidget
+  * Add units to sliders in JointsWidget and to spinbox editor
+  * Avoid need for extra click to operate joint slider
+  * allow control of joints via keyboard
+* Contributors: Robert Haschke
+
+1.1.10 (2022-09-13)
+-------------------
+* Fix rviz segfault when changing move group during execution (`#3123 <https://github.com/ros-planning/moveit/issues/3123>`_)
+* Replace bind() with lambdas (`#3106 <https://github.com/ros-planning/moveit/issues/3106>`_)
+* Replace obsolete distutils.core with setuptools (`#3103 <https://github.com/ros-planning/moveit/issues/3103>`_)
+* Contributors: Michael Görner, Robert Haschke, bsygo
+
+1.1.9 (2022-03-06)
+------------------
+* Add PS3 dual shock model to moveit joy (`#3025 <https://github.com/ros-planning/moveit/issues/3025>`_)
+* Add option to use simulation time for rviz trajectory display (`#3055 <https://github.com/ros-planning/moveit/issues/3055>`_)
+* Contributors: Job van Dieten, Martin Oehler
+
+1.1.8 (2022-01-30)
+------------------
+
+1.1.7 (2021-12-31)
+------------------
+* Move ``MoveItErrorCode`` class to ``moveit_core`` (`#3009 <https://github.com/ros-planning/moveit/issues/3009>`_)
+* ``RobotState::attachBody``: Migrate to ``unique_ptr`` argument (`#3011 <https://github.com/ros-planning/moveit/issues/3011>`_)
+* Fix "ClassLoader: SEVERE WARNING" on reset of MPD (`#2925 <https://github.com/ros-planning/moveit/issues/2925>`_)
+* Switch to ``std::bind`` (`#2967 <https://github.com/ros-planning/moveit/issues/2967>`_)
+* Various fixes to MotionPlanning display (`#2944 <https://github.com/ros-planning/moveit/issues/2944>`_)
+
+  * Avoid flickering of the progress bar
+  * Joints widget: avoid flickering of the nullspace slider
+* Modernize: std::make_shared
+* Contributors: Jafar Abdi, JafarAbdi, Jochen Sprickerhof, Robert Haschke, pvanlaar
+
+1.1.6 (2021-11-06)
+------------------
+* Re-initialize params, subscribers, and topics when the ``MoveGroupNS`` has changed (`#2922 <https://github.com/ros-planning/moveit/issues/2922>`_)
+* Use newly introduced cmake macro ``moveit_build_options()`` from ``moveit_core``
+* Do not save/restore warehouse parameters (`#2865 <https://github.com/ros-planning/moveit/issues/2865>`_) but use the ROS parameters only
+* PSD: Correctly update robot's base pose (`#2876 <https://github.com/ros-planning/moveit/issues/2876>`_)
+* Fix Python2: convert keys() into list (`#2862 <https://github.com/ros-planning/moveit/issues/2862>`_)
+* MP panel: fix order of input widgets for shape size (`#2847 <https://github.com/ros-planning/moveit/issues/2847>`_)
+* Use relative topic name in trajectory visualization to allow namespacing (`#2835 <https://github.com/ros-planning/moveit/issues/2835>`_)
+* MotionPlanningFrame: Gracefully handle undefined parent widget, e.g. for use via ``librviz.so`` (`#2833 <https://github.com/ros-planning/moveit/issues/2833>`_)
+* Introduce a reference frame for collision objects (`#2037 <https://github.com/ros-planning/moveit/issues/2037>`_)
+* clang-tidy: modernize-make-shared, modernize-make-unique (`#2762 <https://github.com/ros-planning/moveit/issues/2762>`_)
+* Support arbitrary real-time factors in trajectory visualization (`#2745 <https://github.com/ros-planning/moveit/issues/2745>`_)
+
+  Replaced special value ``REALTIME`` to accept arbitrary real-time factors in the format ``<number>x``, e.g. ``3x``.
+* Joints tab: Fix handling of mimic + passive joints (`#2744 <https://github.com/ros-planning/moveit/issues/2744>`_)
+* Fix ``TrajectoryPanel``: Keep "Pause/Play" button in correct state (`#2737 <https://github.com/ros-planning/moveit/issues/2737>`_)
+* Fixed error: ``moveit_joy: RuntimeError: dictionary changed size during iteration`` (`#2625 <https://github.com/ros-planning/moveit/issues/2625>`_, `#2628 <https://github.com/ros-planning/moveit/issues/2628>`_)
+* Contributors: Felix von Drigalski, Michael Görner, Rick Staa, Robert Haschke, Yuri Rocha, lorepieri8, pvanlaar
+
+1.1.5 (2021-05-23)
+------------------
+
+1.1.4 (2021-05-12)
+------------------
+
+1.1.3 (2021-04-29)
+------------------
+* Several minor fixups in PlanningSceneDisplay (`#2618 <https://github.com/ros-planning/moveit/issues/2618>`_)
+* Contributors: Michael Görner, Robert Haschke
+
+1.1.2 (2021-04-08)
+------------------
+* Fix various issues in PlanningScene / MotionPlanning displays (`#2588 <https://github.com/ros-planning/moveit/issues/2588>`_)
+* Support multiple planning pipelines with MoveGroup via MoveItCpp (`#2127 <https://github.com/ros-planning/moveit/issues/2127>`_)
+* Allow selecting planning pipeline in RViz MotionPlanningDisplay
+* Catch exceptions during RobotModel loading in rviz (`#2468 <https://github.com/ros-planning/moveit/issues/2468>`_)
+* Fix QObject::connect: Cannot queue arguments of type 'QVector<int>' (`#2392 <https://github.com/ros-planning/moveit/issues/2392>`_)
+* Contributors: Henning Kayser, Michael Görner, Robert Haschke, Simon Schmeisser, Tyler Weaver
+
+1.1.1 (2020-10-13)
+------------------
+* [feature] Clean up Rviz Motion Planning plugin, add tooltips (`#2310 <https://github.com/ros-planning/moveit/issues/2310>`_)
+* [fix]     "Clear Octomap" button, disable when no octomap is published (`#2320 <https://github.com/ros-planning/moveit/issues/2320>`_)
+* [fix]     clang-tidy warning (`#2334 <https://github.com/ros-planning/moveit/issues/2334>`_)
+* [fix]     python3 issues (`#2323 <https://github.com/ros-planning/moveit/issues/2323>`_)
+* [maint]   Cleanup MSA includes (`#2351 <https://github.com/ros-planning/moveit/issues/2351>`_)
+* [maint]   Add comment to MOVEIT_CLASS_FORWARD (`#2315 <https://github.com/ros-planning/moveit/issues/2315>`_)
+* Contributors: Felix von Drigalski, Michael Görner, Robert Haschke
+
+1.1.0 (2020-09-04)
+------------------
+
+1.0.6 (2020-08-19)
+------------------
+* [feature] MP display: add units to joints tab (`#2264 <https://github.com/ros-planning/moveit/issues/2264>`_)
+* [feature] Allow adding planning scene shapes from rviz panel (`#2198 <https://github.com/ros-planning/moveit/issues/2198>`_)
+* [feature] Default to Planning tab initially (`#2061 <https://github.com/ros-planning/moveit/issues/2061>`_)
+* [fix]     Fix deferred robot model loading (`#2245 <https://github.com/ros-planning/moveit/issues/2245>`_)
+* [maint]   Migrate to clang-format-10
+* [maint]   Optimize includes (`#2229 <https://github.com/ros-planning/moveit/issues/2229>`_)
+* Contributors: Jorge Nicho, Markus Vieth, Michael Görner, Robert Haschke, Michael Görner
+
+1.0.5 (2020-07-08)
+------------------
+* [feature] Improve rviz GUI to add PlanningScene objects. Ask for scaling large meshes. (`#2142 <https://github.com/ros-planning/moveit/issues/2142>`_)
+* [maint]   Replace robot_model and robot_state namespaces with moveit::core (`#2135 <https://github.com/ros-planning/moveit/issues/2135>`_)
+* [maint]   Fix catkin_lint issues (`#2120 <https://github.com/ros-planning/moveit/issues/2120>`_)
+* [feature] PlanningSceneDisplay speedup (`#2049 <https://github.com/ros-planning/moveit/issues/2049>`_)
+* [feature] Added support for PS4 joystick (`#2060 <https://github.com/ros-planning/moveit/issues/2060>`_)
+* [fix]     MP display: planning attempts are natural numbers (`#2076 <https://github.com/ros-planning/moveit/issues/2076>`_, `#2082 <https://github.com/ros-planning/moveit/issues/2082>`_)
+* Contributors: Felix von Drigalski, Henning Kayser, Jafar Abdi, Michael Görner, Robert Haschke, Simon Schmeisser, TrippleBender
+
+1.0.4 (2020-05-30)
+------------------
+
+1.0.3 (2020-04-26)
+------------------
+* [fix]     `MotionPlanningDisplay`: change internal shortcut Ctrl+R to Ctrl+I (`#1967 <https://github.com/ros-planning/moveit/issues/1967>`_)
+* [fix]     Remove `PlanningSceneInterface` from rviz display, but use its `PlanningSceneMonitor` instead
+* [fix]     Fix segfault in `RobotStateVisualization` (`#1941 <https://github.com/ros-planning/moveit/issues/1941>`_)
+* [feature] Provide visual feedback on success of requestPlanningSceneState()
+* [feature] Wait for `get_planning_scene` in background (`#1934 <https://github.com/ros-planning/moveit/issues/1934>`_)
+* [feature] Reduce step size for pose-adapting widgets
+* [fix]     Reset `scene_marker` when disabling motion planning panel
+* [fix]     Enable/disable motion planning panel with display
+* [fix]     Enable/disable pose+scale group box when collision object is selected/deselected
+* [fix]     Correctly populate the list of scene objects in the motion planning panel
+* [feature] Resize scene marker with collision object
+* [feature] Show attached bodies in trajectory trail (`#1766 <https://github.com/ros-planning/moveit/issues/1766>`_)
+* [fix]     Fix `REALTIME` trajectory playback (`#1683 <https://github.com/ros-planning/moveit/issues/1683>`_)
+* [maint]   Apply clang-tidy fix to entire code base (`#1394 <https://github.com/ros-planning/moveit/issues/1394>`_)
+* [maint]   Notice changes in rviz planning panel requiring saving (`#1991 <https://github.com/ros-planning/moveit/issues/1991>`_)
+* [maint]   Fix errors: catkin_lint 1.6.7 (`#1987 <https://github.com/ros-planning/moveit/issues/1987>`_)
+* [maint]   Improve Python 3 compatibility (`#1870 <https://github.com/ros-planning/moveit/issues/1870>`_)
+  * Replaced StringIO with BytesIO for python msg serialization
+  * Use py_bindings_tools::ByteString as byte-based serialization buffer on C++ side
+* [maint]   Windows build: Fix binary artifact install locations. (`#1575 <https://github.com/ros-planning/moveit/issues/1575>`_)
+* [maint]   Use CMAKE_CXX_STANDARD to enforce c++14 (`#1607 <https://github.com/ros-planning/moveit/issues/1607>`_)
+* [fix]     Fix pruning of enclosed nodes when rendering octomap in RViz (`#1685 <https://github.com/ros-planning/moveit/issues/1685>`_)
+* [fix]     Fix missing `scene_manager` initialization in OcTreeRender's  constructor (`#1817 <https://github.com/ros-planning/moveit/issues/1817>`_)
+* [feature] new `Joints` tab in RViz motion panel (`#1308 <https://github.com/ros-planning/moveit/issues/1308>`_)
+* [feature] Add `<previous>` robot state to RViz motion panel (`#1742 <https://github.com/ros-planning/moveit/issues/1742>`_)
+* Contributors: Bjar Ne, Dale Koenig, MarqRazz, Max Krichenbauer, Michael Görner, Robert Haschke, RyodoTanaka, Sean Yen, Takara Kasai, Yannick Jonetzko, Yu, Yan, v4hn
+
+1.0.2 (2019-06-28)
+------------------
+* [maintenance] Removed unnecessary null pointer checks on deletion (`#1410 <https://github.com/ros-planning/moveit/issues/1410>`_)
+* Contributors: Mahmoud Ahmed Selim
+
+1.0.1 (2019-03-08)
+------------------
+* [improve] Apply clang tidy fix to entire code base (Part 1) (`#1366 <https://github.com/ros-planning/moveit/issues/1366>`_)
+* Contributors: Isaac Robert Haschke, Yu, Yan
+
+1.0.0 (2019-02-24)
+------------------
+* [fix] catkin_lint issues (`#1341 <https://github.com/ros-planning/moveit/issues/1341>`_)
+* Contributors: Dave Coleman, Robert Haschke
+
+0.10.8 (2018-12-24)
+-------------------
+* [fix] Handle exceptions in rviz plugins (`#1267 <https://github.com/ros-planning/moveit/issues/1267>`_)
+* Contributors: Christian Rauch, Robert Haschke
+
+0.10.7 (2018-12-13)
+-------------------
+
+0.10.6 (2018-12-09)
+-------------------
+* [enhancement] Add check box for CartesianPath planning (`#1238 <https://github.com/ros-planning/moveit/issues/1238>`_)
+* [enhancement] Improve MotionPlanning panel (`#1198 <https://github.com/ros-planning/moveit/issues/1198>`_)
+  * Allow selection of planning group in planning panel
+  * Choose start and goal state directly from combobox
+* [fix] rviz crash when changing the planning group while executing (`#1198 <https://github.com/ros-planning/moveit/issues/1198>`_)
+* [fix] Fix several issues in rendering of attached bodies (`#1199 <https://github.com/ros-planning/moveit/issues/1199>`_)
+  * Show / hide attached body together with robot
+  * Force PlanningScene rendering on enable
+  * Link SceneDisplay's attached-body-color to TrajectoryVisualization's one
+* [maintenance] Replaced Eigen::Affine3d -> Eigen::Isometry3d (`#1096 <https://github.com/ros-planning/moveit/issues/1096>`_)
+* [maintenance] Use C++14 (`#1146 <https://github.com/ros-planning/moveit/issues/1146>`_)
+* [maintenance] Cleanup Robot Interaction (`#1194 <https://github.com/ros-planning/moveit/issues/1194>`_)
+  * Postpone subscription to trajectory topic
+  * Fix memory leaks
+* [maintenance] Simplify shared tf2 buffer usage (`#1196 <https://github.com/ros-planning/moveit/issues/1196>`_)
+* [maintenance] Code Cleanup (`#1179 <https://github.com/ros-planning/moveit/issues/1179>`_)
+* Remove obsolete eigen_conversions dependency (`#1181 <https://github.com/ros-planning/moveit/issues/1181>`_)
+* Contributors: Alex Moriarty, Benjamin Scholz, Dave Coleman, Kei Okada, Michael Görner, Robert Haschke, Sven Krause
+
+0.10.5 (2018-11-01)
+-------------------
+
+0.10.4 (2018-10-29)
+-------------------
+
+0.10.3 (2018-10-29)
+-------------------
+* [maintenance] Store more settings of rviz' PlanningFrame (`#1135 <https://github.com/ros-planning/moveit/issues/1135>`_)
+* [maintenance] Lint visualization (`#1144 <https://github.com/ros-planning/moveit/issues/1144>`_)
+* Contributors: Alexander Gutenkunst, Dave Coleman
+
+0.10.2 (2018-10-24)
+-------------------
+* [fix] build issue in boost/thread/mutex.hpp (`#1055 <https://github.com/ros-planning/moveit/issues/1055>`_)
+* [fix] optional namespace args (`#929 <https://github.com/ros-planning/moveit/issues/929>`_)
+* [maintenance] Python3 support (`#1103 <https://github.com/ros-planning/moveit/issues/1103>`_, `#1054 <https://github.com/ros-planning/moveit/issues/1054>`_)
+* [maintenance] add minimum required pluginlib version (`#927 <https://github.com/ros-planning/moveit/issues/927>`_)
+* Contributors: Michael Görner, Mikael Arguedas, Mohmmad Ayman, Robert Haschke, Timon Engelke, mike lautman
+
+0.10.1 (2018-05-25)
+-------------------
+* [maintenance] migration from tf to tf2 API (`#830 <https://github.com/ros-planning/moveit/issues/830>`_)
 * [feature] rviz plugin: set start/goal RobotState from external (`#823 <https://github.com/ros-planning/moveit/issues/823>`_)
   - /rviz/moveit/update_custom_start_state
   - /rviz/moveit/update_custom_goal_state

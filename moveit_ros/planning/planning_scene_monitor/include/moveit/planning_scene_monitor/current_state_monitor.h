@@ -34,46 +34,41 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_PLANNING_SCENE_MONITOR_CURRENT_STATE_MONITOR_
-#define MOVEIT_PLANNING_SCENE_MONITOR_CURRENT_STATE_MONITOR_
+#pragma once
 
 #include <ros/ros.h>
-#include <tf/tf.h>
+#include <tf2_ros/buffer.h>
 #include <moveit/robot_state/robot_state.h>
 #include <sensor_msgs/JointState.h>
 #include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include <moveit/macros/deprecation.h>
 #include <boost/thread/condition_variable.hpp>
 
 namespace planning_scene_monitor
 {
-typedef boost::function<void(const sensor_msgs::JointStateConstPtr& joint_state)> JointStateUpdateCallback;
+using JointStateUpdateCallback = boost::function<void(const sensor_msgs::JointStateConstPtr&)>;
 
-/** @class CurrentStateMonitor
-    @brief Monitors the joint_states topic and tf to maintain the current state of the robot. */
+/** Monitors the joint_states topic and tf to maintain the current state of the robot. */
 class CurrentStateMonitor
 {
-  /* tf changed their interface between indigo and kinetic
-     from boost::signals::connection to boost::signals2::connection */
-  typedef decltype(tf::Transformer().addTransformsChangedListener(boost::function<void(void)>())) TFConnection;
+  using TFConnection = boost::signals2::connection;
 
 public:
   /**
-   * @brief Constructor.
+   * @brief Constructor
    * @param robot_model The current kinematic model to build on
-   * @param tf A pointer to the tf transformer to use
+   * @param tf_buffer A pointer to the tf2_ros Buffer to use
    */
-  CurrentStateMonitor(const robot_model::RobotModelConstPtr& robot_model, const boost::shared_ptr<tf::Transformer>& tf);
+  CurrentStateMonitor(const moveit::core::RobotModelConstPtr& robot_model,
+                      const std::shared_ptr<tf2_ros::Buffer>& tf_buffer);
 
   /** @brief Constructor.
    *  @param robot_model The current kinematic model to build on
-   *  @param tf A pointer to the tf transformer to use
+   *  @param tf_buffer A pointer to the tf2_ros Buffer to use
    *  @param nh A ros::NodeHandle to pass node specific options
    */
-  CurrentStateMonitor(const robot_model::RobotModelConstPtr& robot_model, const boost::shared_ptr<tf::Transformer>& tf,
-                      ros::NodeHandle nh);
+  CurrentStateMonitor(const moveit::core::RobotModelConstPtr& robot_model,
+                      const std::shared_ptr<tf2_ros::Buffer>& tf_buffer, const ros::NodeHandle& nh);
 
   ~CurrentStateMonitor();
 
@@ -90,7 +85,7 @@ public:
   bool isActive() const;
 
   /** @brief Get the RobotModel for which we are monitoring state */
-  const robot_model::RobotModelConstPtr& getRobotModel() const
+  const moveit::core::RobotModelConstPtr& getRobotModel() const
   {
     return robot_model_;
   }
@@ -101,40 +96,72 @@ public:
   /** @brief Query whether we have joint state information for all DOFs in the kinematic model
    *  @return False if we have no joint state information for one or more of the joints
    */
-  bool haveCompleteState() const;
+  inline bool haveCompleteState() const
+  {
+    return haveCompleteStateHelper(ros::Time(0), nullptr);
+  }
 
   /** @brief Query whether we have joint state information for all DOFs in the kinematic model
+   *  @param oldest_allowed_update_time All joint information must be from this time or more current
+   *  @return False if we have no joint state information for one of the joints or if our state
+   *  information is more than \e age old*/
+  inline bool haveCompleteState(const ros::Time& oldest_allowed_update_time) const
+  {
+    return haveCompleteStateHelper(oldest_allowed_update_time, nullptr);
+  }
+
+  /** @brief Query whether we have joint state information for all DOFs in the kinematic model
+   *  @param age Joint information must be at most this old
    *  @return False if we have no joint state information for one of the joints or if our state
    *  information is more than \e age old
    */
-  bool haveCompleteState(const ros::Duration& age) const;
+  inline bool haveCompleteState(const ros::Duration& age) const
+  {
+    return haveCompleteStateHelper(ros::Time::now() - age, nullptr);
+  }
 
   /** @brief Query whether we have joint state information for all DOFs in the kinematic model
    *  @param missing_joints Returns the list of joints that are missing
    *  @return False if we have no joint state information for one or more of the joints
    */
-  bool haveCompleteState(std::vector<std::string>& missing_joints) const;
+  inline bool haveCompleteState(std::vector<std::string>& missing_joints) const
+  {
+    return haveCompleteStateHelper(ros::Time(0), &missing_joints);
+  }
 
   /** @brief Query whether we have joint state information for all DOFs in the kinematic model
-   *  @param age The max allowed age of the joint state information
-   *  @param missing_states Returns the list of joints that are missing
+   *  @param oldest_allowed_update_time All joint information must be from this time or more current
+   *  @param missing_joints Returns the list of joints that are missing
    *  @return False if we have no joint state information for one of the joints or if our state
    *  information is more than \e age old*/
-  bool haveCompleteState(const ros::Duration& age, std::vector<std::string>& missing_states) const;
+  inline bool haveCompleteState(const ros::Time& oldest_allowed_update_time,
+                                std::vector<std::string>& missing_joints) const
+  {
+    return haveCompleteStateHelper(oldest_allowed_update_time, &missing_joints);
+  }
+
+  /** @brief Query whether we have joint state information for all DOFs in the kinematic model
+   *  @return False if we have no joint state information for one of the joints or if our state
+   *  information is more than \e age old
+   */
+  inline bool haveCompleteState(const ros::Duration& age, std::vector<std::string>& missing_joints) const
+  {
+    return haveCompleteStateHelper(ros::Time::now() - age, &missing_joints);
+  }
 
   /** @brief Get the current state
    *  @return Returns the current state */
-  robot_state::RobotStatePtr getCurrentState() const;
+  moveit::core::RobotStatePtr getCurrentState() const;
 
   /** @brief Set the state \e upd to the current state maintained by this class. */
-  void setToCurrentState(robot_state::RobotState& upd) const;
+  void setToCurrentState(moveit::core::RobotState& upd) const;
 
   /** @brief Get the time stamp for the current state */
   ros::Time getCurrentStateTime() const;
 
   /** @brief Get the current state and its time stamp
    *  @return Returns a pair of the current state and its time stamp */
-  std::pair<robot_state::RobotStatePtr, ros::Time> getCurrentStateAndTime() const;
+  std::pair<moveit::core::RobotStatePtr, ros::Time> getCurrentStateAndTime() const;
 
   /** @brief Get the current state values as a map from joint names to joint state values
    *  @return Returns the map from joint names to joint state values*/
@@ -142,20 +169,16 @@ public:
 
   /** @brief Wait for at most \e wait_time seconds (default 1s) for a robot state more recent than t
    *  @return true on success, false if up-to-date robot state wasn't received within \e wait_time
-  */
+   */
   bool waitForCurrentState(const ros::Time t = ros::Time::now(), double wait_time = 1.0) const;
 
   /** @brief Wait for at most \e wait_time seconds until the complete robot state is known.
       @return true if the full state is known */
   bool waitForCompleteState(double wait_time) const;
-  /** replaced by waitForCompleteState, will be removed in L-turtle: function waits for complete robot state */
-  MOVEIT_DEPRECATED bool waitForCurrentState(double wait_time) const;
 
   /** @brief Wait for at most \e wait_time seconds until the joint values from the group \e group are known. Return true
    * if values for all joints in \e group are known */
   bool waitForCompleteState(const std::string& group, double wait_time) const;
-  /** replaced by waitForCompleteState, will be removed in L-turtle: function waits for complete robot state */
-  MOVEIT_DEPRECATED bool waitForCurrentState(const std::string& group, double wait_time) const;
 
   /** @brief Get the time point when the monitor was started */
   const ros::Time& getMonitorStartTime() const
@@ -196,13 +219,16 @@ public:
   }
 
 private:
+  bool haveCompleteStateHelper(const ros::Time& oldest_allowed_update_time,
+                               std::vector<std::string>* missing_joints) const;
+
   void jointStateCallback(const sensor_msgs::JointStateConstPtr& joint_state);
   void tfCallback();
 
   ros::NodeHandle nh_;
-  boost::shared_ptr<tf::Transformer> tf_;
-  robot_model::RobotModelConstPtr robot_model_;
-  robot_state::RobotState robot_state_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  moveit::core::RobotModelConstPtr robot_model_;
+  moveit::core::RobotState robot_state_;
   std::map<const moveit::core::JointModel*, ros::Time> joint_time_;
   bool state_monitor_started_;
   bool copy_dynamics_;  // Copy velocity and effort from joint_state
@@ -218,7 +244,5 @@ private:
   std::shared_ptr<TFConnection> tf_connection_;
 };
 
-MOVEIT_CLASS_FORWARD(CurrentStateMonitor);
-}
-
-#endif
+MOVEIT_CLASS_FORWARD(CurrentStateMonitor);  // Defines CurrentStateMonitorPtr, ConstPtr, WeakPtr... etc
+}  // namespace planning_scene_monitor

@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_MOVE_GROUP_MOVE_ACTION_CAPABILITY_
-#define MOVEIT_MOVE_GROUP_MOVE_ACTION_CAPABILITY_
+#pragma once
 
 #include <moveit/move_group/move_group_capability.h>
 #include <actionlib/server/simple_action_server.h>
@@ -49,14 +48,14 @@ class MoveGroupMoveAction : public MoveGroupCapability
 public:
   MoveGroupMoveAction();
 
-  virtual void initialize();
+  void initialize() override;
 
 private:
   void executeMoveCallback(const moveit_msgs::MoveGroupGoalConstPtr& goal);
-  void executeMoveCallback_PlanAndExecute(const moveit_msgs::MoveGroupGoalConstPtr& goal,
-                                          moveit_msgs::MoveGroupResult& action_res);
-  void executeMoveCallback_PlanOnly(const moveit_msgs::MoveGroupGoalConstPtr& goal,
-                                    moveit_msgs::MoveGroupResult& action_res);
+  void executeMoveCallbackPlanAndExecute(const moveit_msgs::MoveGroupGoalConstPtr& goal,
+                                         moveit_msgs::MoveGroupResult& action_res);
+  void executeMoveCallbackPlanOnly(const moveit_msgs::MoveGroupGoalConstPtr& goal,
+                                   moveit_msgs::MoveGroupResult& action_res);
   void startMoveExecutionCallback();
   void startMoveLookCallback();
   void preemptMoveCallback();
@@ -70,6 +69,4 @@ private:
   MoveGroupState move_state_;
   bool preempt_requested_;
 };
-}
-
-#endif
+}  // namespace move_group

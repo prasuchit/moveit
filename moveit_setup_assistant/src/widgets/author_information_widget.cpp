@@ -39,28 +39,17 @@
 #include <QPushButton>
 #include <QMessageBox>
 #include <QApplication>
-#include <QSplitter>
-// ROS
+#include <QLabel>
+#include <QLineEdit>
 #include "author_information_widget.h"
-#include <srdfdom/model.h>  // use their struct datastructures
-#include <ros/ros.h>
-// Boost
-#include <boost/algorithm/string.hpp>  // for trimming whitespace from user input
-#include <boost/filesystem.hpp>        // for creating folders/files
-// Read write files
-#include <iostream>  // For writing yaml and launch files
-#include <fstream>
+#include "header_widget.h"
 
 namespace moveit_setup_assistant
 {
-// Boost file system
-namespace fs = boost::filesystem;
-
 // ******************************************************************************************
-// Outer User Interface for MoveIt! Configuration Assistant
+// Outer User Interface for MoveIt Configuration Assistant
 // ******************************************************************************************
-AuthorInformationWidget::AuthorInformationWidget(QWidget* parent,
-                                                 moveit_setup_assistant::MoveItConfigDataPtr config_data)
+AuthorInformationWidget::AuthorInformationWidget(QWidget* parent, const MoveItConfigDataPtr& config_data)
   : SetupScreenWidget(parent), config_data_(config_data)
 {
   // Basic widget container
@@ -69,27 +58,27 @@ AuthorInformationWidget::AuthorInformationWidget(QWidget* parent,
 
   // Top Header Area ------------------------------------------------
 
-  HeaderWidget* header =
-      new HeaderWidget("Author Information", "Specify contact information of the author and initial maintainer of the "
-                                             "generated package. catkin requires valid details in the package's "
-                                             "package.xml",
-                       this);
+  HeaderWidget* header = new HeaderWidget("Specify Author Information",
+                                          "Input contact information of the author and initial maintainer of the "
+                                          "generated package. catkin requires valid details in the package's "
+                                          "package.xml",
+                                          this);
   layout->addWidget(header);
 
   QLabel* name_title = new QLabel(this);
-  name_title->setText("Name of the maintainer this MoveIt! configuration:");
+  name_title->setText("Name of the maintainer of this MoveIt configuration:");
   layout->addWidget(name_title);
 
   name_edit_ = new QLineEdit(this);
-  connect(name_edit_, SIGNAL(editingFinished()), this, SLOT(edited_name()));
+  connect(name_edit_, SIGNAL(editingFinished()), this, SLOT(editedName()));
   layout->addWidget(name_edit_);
 
   QLabel* email_title = new QLabel(this);
-  email_title->setText("Email of the maintainer of this MoveIt! configuration:");
+  email_title->setText("Email of the maintainer of this MoveIt configuration:");
   layout->addWidget(email_title);
 
   email_edit_ = new QLineEdit(this);
-  connect(email_edit_, SIGNAL(editingFinished()), this, SLOT(edited_email()));
+  connect(email_edit_, SIGNAL(editingFinished()), this, SLOT(editedEmail()));
   layout->addWidget(email_edit_);
 
   // Finish Layout --------------------------------------------------
@@ -106,16 +95,16 @@ void AuthorInformationWidget::focusGiven()
   this->email_edit_->setText(QString::fromStdString(config_data_->author_email_));
 }
 
-void AuthorInformationWidget::edited_name()
+void AuthorInformationWidget::editedName()
 {
   config_data_->author_name_ = this->name_edit_->text().toStdString();
   config_data_->changes |= MoveItConfigData::AUTHOR_INFO;
 }
 
-void AuthorInformationWidget::edited_email()
+void AuthorInformationWidget::editedEmail()
 {
   config_data_->author_email_ = this->email_edit_->text().toStdString();
   config_data_->changes |= MoveItConfigData::AUTHOR_INFO;
 }
 
-}  // namespace
+}  // namespace moveit_setup_assistant

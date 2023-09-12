@@ -34,44 +34,50 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_MOVE_GROUP_CONTEXT_
-#define MOVEIT_MOVE_GROUP_CONTEXT_
+#pragma once
 
+#include <string>
 #include <moveit/macros/class_forward.h>
+
+namespace moveit_cpp
+{
+MOVEIT_CLASS_FORWARD(MoveItCpp);
+}
 
 namespace planning_scene_monitor
 {
-MOVEIT_CLASS_FORWARD(PlanningSceneMonitor);
+MOVEIT_CLASS_FORWARD(PlanningSceneMonitor);  // Defines PlanningSceneMonitorPtr, ConstPtr, WeakPtr... etc
 }
 
 namespace planning_pipeline
 {
-MOVEIT_CLASS_FORWARD(PlanningPipeline);
+MOVEIT_CLASS_FORWARD(PlanningPipeline);  // Defines PlanningPipelinePtr, ConstPtr, WeakPtr... etc
 }
 
 namespace plan_execution
 {
-MOVEIT_CLASS_FORWARD(PlanExecution);
-MOVEIT_CLASS_FORWARD(PlanWithSensing);
-}
+MOVEIT_CLASS_FORWARD(PlanExecution);    // Defines PlanExecutionPtr, ConstPtr, WeakPtr... etc
+MOVEIT_CLASS_FORWARD(PlanWithSensing);  // Defines PlanWithSensingPtr, ConstPtr, WeakPtr... etc
+}  // namespace plan_execution
 
 namespace trajectory_execution_manager
 {
-MOVEIT_CLASS_FORWARD(TrajectoryExecutionManager);
+MOVEIT_CLASS_FORWARD(TrajectoryExecutionManager);  // Defines TrajectoryExecutionManagerPtr, ConstPtr, WeakPtr... etc
 }
 
 namespace move_group
 {
-MOVEIT_CLASS_FORWARD(MoveGroupContext);
+MOVEIT_STRUCT_FORWARD(MoveGroupContext);
 
 struct MoveGroupContext
 {
-  MoveGroupContext(const planning_scene_monitor::PlanningSceneMonitorPtr& planning_scene_monitor,
+  MoveGroupContext(const moveit_cpp::MoveItCppPtr& moveit_cpp, const std::string& default_planning_pipeline,
                    bool allow_trajectory_execution = false, bool debug = false);
   ~MoveGroupContext();
 
   bool status() const;
 
+  moveit_cpp::MoveItCppPtr moveit_cpp_;
   planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
   trajectory_execution_manager::TrajectoryExecutionManagerPtr trajectory_execution_manager_;
   planning_pipeline::PlanningPipelinePtr planning_pipeline_;
@@ -80,6 +86,4 @@ struct MoveGroupContext
   bool allow_trajectory_execution_;
   bool debug_;
 };
-}
-
-#endif
+}  // namespace move_group

@@ -55,22 +55,22 @@ double constraint_samplers::countSamplesPerSecond(const moveit_msgs::Constraints
 }
 
 double constraint_samplers::countSamplesPerSecond(const ConstraintSamplerPtr& sampler,
-                                                  const robot_state::RobotState& reference_state)
+                                                  const moveit::core::RobotState& reference_state)
 {
   if (!sampler)
   {
     ROS_ERROR_NAMED("constraint_samplers", "No sampler specified for counting samples per second");
     return 0.0;
   }
-  robot_state::RobotState ks(reference_state);
+  moveit::core::RobotState ks(reference_state);
   unsigned long int valid = 0;
   unsigned long int total = 0;
   ros::WallTime end = ros::WallTime::now() + ros::WallDuration(1.0);
   do
   {
-    static const unsigned int n = 10;
-    total += n;
-    for (unsigned int i = 0; i < n; ++i)
+    static const unsigned int N = 10;
+    total += N;
+    for (unsigned int i = 0; i < N; ++i)
     {
       if (sampler->sample(ks, 1))
         valid++;
@@ -80,7 +80,7 @@ double constraint_samplers::countSamplesPerSecond(const ConstraintSamplerPtr& sa
 }
 
 void constraint_samplers::visualizeDistribution(const ConstraintSamplerPtr& sampler,
-                                                const robot_state::RobotState& reference_state,
+                                                const moveit::core::RobotState& reference_state,
                                                 const std::string& link_name, unsigned int sample_count,
                                                 visualization_msgs::MarkerArray& markers)
 {
@@ -89,10 +89,10 @@ void constraint_samplers::visualizeDistribution(const ConstraintSamplerPtr& samp
     ROS_ERROR_NAMED("constraint_samplers", "No sampler specified for visualizing distribution of samples");
     return;
   }
-  const robot_state::LinkModel* lm = reference_state.getLinkModel(link_name);
+  const moveit::core::LinkModel* lm = reference_state.getLinkModel(link_name);
   if (!lm)
     return;
-  robot_state::RobotState ks(reference_state);
+  moveit::core::RobotState ks(reference_state);
   std_msgs::ColorRGBA color;
   color.r = 1.0f;
   color.g = 0.0f;

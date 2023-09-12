@@ -33,20 +33,24 @@
 
 /* Author: Mohamad Ayman */
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QMessageBox>
+#include <QComboBox>
 #include <QFormLayout>
-#include <QString>
 #include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QString>
+#include <QVBoxLayout>
 #include "controller_edit_widget.h"
 
-namespace moveit_ros_control
+namespace moveit_setup_assistant
 {
 // ******************************************************************************************
 //  ControllerEditWidget constructor, create controller edit screen GUI
 // ******************************************************************************************
-ControllerEditWidget::ControllerEditWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data)
+ControllerEditWidget::ControllerEditWidget(QWidget* parent, const MoveItConfigDataPtr& config_data)
   : QWidget(parent), config_data_(config_data)
 {
   // Basic widget container
@@ -114,10 +118,8 @@ ControllerEditWidget::ControllerEditWidget(QWidget* parent, moveit_setup_assista
   new_buttons_widget_->setLayout(new_buttons_layout);
   layout->addWidget(new_buttons_widget_);
 
-  // Verticle Spacer -----------------------------------------------------
-  QWidget* vspacer = new QWidget(this);
-  vspacer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-  layout->addWidget(vspacer);
+  // Vertical Spacer
+  layout->addItem(new QSpacerItem(20, 20, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
   // Bottom Controls ---------------------------------------------------------
   QHBoxLayout* controls_layout = new QHBoxLayout();
@@ -130,9 +132,7 @@ ControllerEditWidget::ControllerEditWidget(QWidget* parent, moveit_setup_assista
   controls_layout->setAlignment(btn_delete_, Qt::AlignRight);
 
   // Horizontal Spacer
-  QWidget* spacer = new QWidget(this);
-  spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  controls_layout->addWidget(spacer);
+  controls_layout->addItem(new QSpacerItem(20, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
   // Save
   btn_save_ = new QPushButton("&Save", this);
@@ -161,9 +161,8 @@ ControllerEditWidget::ControllerEditWidget(QWidget* parent, moveit_setup_assista
 void ControllerEditWidget::setSelected(const std::string& controller_name)
 {
   controller_name_field_->setText(QString(controller_name.c_str()));
-  moveit_setup_assistant::ROSControlConfig* searched_controller =
-      config_data_->findROSControllerByName(controller_name);
-  if (searched_controller != NULL)
+  moveit_setup_assistant::ControllerConfig* searched_controller = config_data_->findControllerByName(controller_name);
+  if (searched_controller != nullptr)
   {
     const std::string controller_type = searched_controller->type_;
     int type_index = controller_type_field_->findText(controller_type.c_str());
@@ -195,19 +194,13 @@ void ControllerEditWidget::loadControllersTypesComboBox()
     return;
   has_loaded_ = true;
 
-  const std::array<std::string, 9> default_types = {
-    "effort_controllers/JointTrajectoryController",   "effort_controllers/JointPositionController",
-    "effort_controllers/JointVelocityController",     "effort_controllers/JointEffortController",
-    "joint_state_controller/JointStateController",    "position_controllers/JointPositionController",
-    "position_controllers/JointTrajectoryController", "velocity_controllers/JointTrajectoryController",
-    "velocity_controllers/JointvelocityController"
-  };
+  const std::vector<std::string> default_types = { "effort_controllers/JointTrajectoryController",
+                                                   "velocity_controllers/JointTrajectoryController",
+                                                   "position_controllers/JointTrajectoryController",
+                                                   "FollowJointTrajectory", "GripperCommand" };
 
   // Remove all old items
   controller_type_field_->clear();
-
-  // Add FollowJointTrajectory option, the default
-  controller_type_field_->addItem("FollowJointTrajectory");
 
   // Loop through all controller default_types and add to combo box
   for (const std::string& type : default_types)
@@ -259,4 +252,4 @@ std::string ControllerEditWidget::getControllerType()
   return controller_type_field_->currentText().toStdString();
 }
 
-}  // namespace
+}  // namespace moveit_setup_assistant

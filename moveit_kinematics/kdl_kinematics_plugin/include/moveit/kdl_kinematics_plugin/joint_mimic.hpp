@@ -34,8 +34,7 @@
 
 /* Author: Sachin Chitta */
 
-#ifndef MOVEIT_KDL_KINEMATICS_PLUGIN_JOINT_MIMIC
-#define MOVEIT_KDL_KINEMATICS_PLUGIN_JOINT_MIMIC
+#pragma once
 
 namespace kdl_kinematics_plugin
 {
@@ -49,7 +48,7 @@ public:
   JointMimic()
   {
     this->reset(0);
-  };
+  }
 
   /** \brief Offset for this joint value from the joint that it mimics */
   double offset;
@@ -68,8 +67,6 @@ public:
     multiplier = 1.0;
     map_index = index;
     active = false;
-  };
+  }
 };
-}
-
-#endif
+}  // namespace kdl_kinematics_plugin

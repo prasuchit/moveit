@@ -34,22 +34,12 @@
 
 /* Author: Dave Coleman */
 
-#ifndef MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_SETUP_ASSISTANT_WIDGET_
-#define MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_SETUP_ASSISTANT_WIDGET_
+#pragma once
 
 // Qt
-#include <QWidget>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QString>
-#include <QApplication>
-#include <QObject>
-#include <QEvent>
-#include <QListWidget>
-#include <QTimer>
-#include <QSplitter>
-#include <QStringList>
-// Setup Asst
+class QSplitter;
+
+// Setup Assistant
 #include "navigation_widget.h"
 #include "start_screen_widget.h"
 #include "default_collisions_widget.h"
@@ -62,14 +52,13 @@
 #include "simulation_widget.h"
 #include "configuration_files_widget.h"
 #include "perception_widget.h"
-#include "ros_controllers_widget.h"
+#include "controllers_widget.h"
 
 #ifndef Q_MOC_RUN
 #include <moveit/setup_assistant/tools/moveit_config_data.h>
 
 // Other
-#include <ros/ros.h>
-#include <boost/program_options.hpp>  // for parsing input arguments
+#include <boost/program_options/variables_map.hpp>  // for parsing input arguments
 #include <boost/thread/mutex.hpp>
 #endif
 
@@ -79,7 +68,7 @@ namespace rviz
 class GridDisplay;
 class RenderPanel;
 class VisualizationManager;
-}
+}  // namespace rviz
 
 namespace moveit_rviz_plugin
 {
@@ -102,13 +91,13 @@ public:
    * @param parent - used by Qt for destructing all elements
    * @return
    */
-  SetupAssistantWidget(QWidget* parent, boost::program_options::variables_map args);
+  SetupAssistantWidget(QWidget* parent, const boost::program_options::variables_map& args);
 
   /**
    * Deconstructor
    *
    */
-  ~SetupAssistantWidget();
+  ~SetupAssistantWidget() override;
 
   /**
    * Changes viewable screen
@@ -121,7 +110,7 @@ public:
    * Qt close event function for reminding user to save
    * @param event A Qt paramenter
    */
-  void closeEvent(QCloseEvent* event);
+  void closeEvent(QCloseEvent* event) override;
 
   /**
    * Qt error handling function
@@ -203,10 +192,9 @@ private:
   QList<QString> nav_name_list_;
   NavigationWidget* navs_view_;
 
-  QWidget* middle_frame_;
   QWidget* rviz_container_;
   QSplitter* splitter_;
-  QStackedLayout* main_content_;
+  QStackedWidget* main_content_;
   int current_index_;
   boost::mutex change_screen_lock_;
 
@@ -227,15 +215,13 @@ private:
   ConfigurationFilesWidget* configuration_files_widget_;
   SimulationWidget* simulation_widget_;
   PerceptionWidget* perception_widget_;
-  moveit_ros_control::ROSControllersWidget* controllers_widget_;
+  ControllersWidget* controllers_widget_;
 
   /// Contains all the configuration data for the setup assistant
-  moveit_setup_assistant::MoveItConfigDataPtr config_data_;
+  MoveItConfigDataPtr config_data_;
 
   // ******************************************************************************************
   // Private Functions
   // ******************************************************************************************
 };
-}
-
-#endif
+}  // namespace moveit_setup_assistant

@@ -34,8 +34,7 @@
 
 /** \Author: Benjamin Cohen /bcohen@willowgarage.com, E. Gil Jones **/
 
-#ifndef _ENVIRONMENT_CHAIN3D_H_
-#define _ENVIRONMENT_CHAIN3D_H_
+#pragma once
 
 #include <time.h>
 #include <stdio.h>
@@ -51,8 +50,7 @@
 #include <sbpl/headers.h>
 #include <sbpl_interface/bfs3d/BFS_3D.h>
 #include <planning_scene/planning_scene.h>
-#include <collision_distance_field/collision_robot_hybrid.h>
-#include <collision_distance_field/collision_world_hybrid.h>
+#include <collision_distance_field/collision_env_hybrid.h>
 #include <sbpl_interface/environment_chain3d_types.h>
 #include <moveit_msgs/GetMotionPlan.h>
 
@@ -229,7 +227,7 @@ public:
 
   bool getPlaneBFSMarker(visualization_msgs::Marker& plane_marker, double z_val);
 
-  const Eigen::Affine3d& getGoalPose() const
+  const Eigen::Isometry3d& getGoalPose() const
   {
     return goal_pose_;
   }
@@ -237,7 +235,7 @@ public:
   void attemptShortcut(const trajectory_msgs::JointTrajectory& traj_in, trajectory_msgs::JointTrajectory& traj_out);
 
 protected:
-  bool getGridXYZInt(const Eigen::Affine3d& pose, int (&xyz)[3]) const;
+  bool getGridXYZInt(const Eigen::Isometry3d& pose, int (&xyz)[3]) const;
 
   void getMotionPrimitives(const std::string& group);
 
@@ -249,8 +247,7 @@ protected:
   std::vector<boost::shared_ptr<JointMotionWrapper> > joint_motion_wrappers_;
   std::vector<boost::shared_ptr<JointMotionPrimitive> > possible_actions_;
   planning_models::RobotState* state_;
-  const collision_detection::CollisionWorldHybrid* hy_world_;
-  const collision_detection::CollisionRobotHybrid* hy_robot_;
+  const collision_detection::CollisionEnvHybrid* hy_env_;
   planning_models::RobotState* ::JointStateGroup* joint_state_group_;
   boost::shared_ptr<collision_detection::GroupStateRepresentation> gsr_;
   // boost::shared_ptr<kinematics::KinematicsBase> kinematics_solver_;
@@ -259,7 +256,7 @@ protected:
   kinematic_constraints::KinematicConstraintSet goal_constraint_set_;
   kinematic_constraints::KinematicConstraintSet path_constraint_set_;
   std::string planning_group_;
-  Eigen::Affine3d goal_pose_;
+  Eigen::Isometry3d goal_pose_;
   PlanningStatistics planning_statistics_;
   PlanningParameters planning_parameters_;
   int maximum_distance_for_motion_;
@@ -333,6 +330,4 @@ inline void EnvironmentChain3D::convertJointAnglesToCoord(const std::vector<doub
 //   return sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2));
 // }
 
-}  // namespace
-
-#endif
+}  // namespace sbpl_interface

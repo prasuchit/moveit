@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_CONSTRAINT_SAMPLERS_DEFAULT_UNION_CONSTRAINT_SAMPLER_
-#define MOVEIT_CONSTRAINT_SAMPLERS_DEFAULT_UNION_CONSTRAINT_SAMPLER_
+#pragma once
 
 #include <moveit/constraint_samplers/constraint_sampler.h>
 
@@ -113,24 +112,26 @@ public:
    * \brief No-op, as the union constraint sampler is for already
    * configured samplers
    *
-   * @param [in] constr Constraint message
+   * @param [in] constraint Constraint message
    *
    * @return Always true
    */
-  virtual bool configure(const moveit_msgs::Constraints& constr)
+  bool configure(const moveit_msgs::Constraints& constraint) override
   {
+    (void)constraint;
     return true;
   }
 
   /**
    * \brief No-op, as the union constraint sampler can act on anything
    *
-   * @param [in] constr Constraint message
+   * @param [in] constraint Constraint message
    *
    * @return Always true
    */
-  virtual bool canService(const moveit_msgs::Constraints& constr) const
+  virtual bool canService(const moveit_msgs::Constraints& constraint) const
   {
+    (void)constraint;
     return true;
   }
 
@@ -149,17 +150,15 @@ public:
    *
    * @return True if all invidual samplers return true
    */
-  virtual bool sample(robot_state::RobotState& state, const robot_state::RobotState& reference_state,
-                      unsigned int max_attempts);
-
-  virtual bool project(robot_state::RobotState& state, unsigned int max_attempts);
+  bool sample(moveit::core::RobotState& state, const moveit::core::RobotState& reference_state,
+              unsigned int max_attempts) override;
 
   /**
    * \brief Get the name of the constraint sampler, for debugging purposes
    * should be in CamelCase format.
    * \return string of name
    */
-  virtual const std::string& getName() const
+  const std::string& getName() const override
   {
     static const std::string SAMPLER_NAME = "UnionConstraintSampler";
     return SAMPLER_NAME;
@@ -168,6 +167,4 @@ public:
 protected:
   std::vector<ConstraintSamplerPtr> samplers_; /**< \brief Holder for sorted internal list of samplers*/
 };
-}
-
-#endif
+}  // namespace constraint_samplers

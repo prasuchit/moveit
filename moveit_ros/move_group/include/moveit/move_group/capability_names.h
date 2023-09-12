@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_MOVE_GROUP_DEFAULT_CAPABILITY_NAMES
-#define MOVEIT_MOVE_GROUP_DEFAULT_CAPABILITY_NAMES
+#pragma once
 
 #include <string>
 
@@ -43,8 +42,6 @@ namespace move_group
 {
 static const std::string PLANNER_SERVICE_NAME =
     "plan_kinematic_path";  // name of the advertised service (within the ~ namespace)
-static const std::string EXECUTE_SERVICE_NAME =
-    "execute_kinematic_path";  // name of the advertised service (within the ~ namespace)
 static const std::string EXECUTE_ACTION_NAME = "execute_trajectory";  // name of 'execute' action
 static const std::string QUERY_PLANNERS_SERVICE_NAME =
     "query_planner_interface";  // name of the advertised query planners service
@@ -65,6 +62,4 @@ static const std::string APPLY_PLANNING_SCENE_SERVICE_NAME =
     "apply_planning_scene";  // name of the service that applies a given planning scene
 static const std::string CLEAR_OCTOMAP_SERVICE_NAME =
     "clear_octomap";  // name of the service that can be used to clear the octomap
-}
-
-#endif
+}  // namespace move_group

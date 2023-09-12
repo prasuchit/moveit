@@ -34,12 +34,11 @@
 
 /* Author: Jon Binney, Ioan Sucan */
 
-#ifndef MOVEIT_PERCEPTION_POINTCLOUD_OCTOMAP_UPDATER_
-#define MOVEIT_PERCEPTION_POINTCLOUD_OCTOMAP_UPDATER_
+#pragma once
 
 #include <ros/ros.h>
-#include <tf/tf.h>
-#include <tf/message_filter.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/message_filter.h>
 #include <message_filters/subscriber.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_updater.h>
@@ -53,28 +52,30 @@ class PointCloudOctomapUpdater : public OccupancyMapUpdater
 {
 public:
   PointCloudOctomapUpdater();
-  virtual ~PointCloudOctomapUpdater();
+  ~PointCloudOctomapUpdater() override;
 
-  virtual bool setParams(XmlRpc::XmlRpcValue& params);
+  bool setParams(XmlRpc::XmlRpcValue& params) override;
 
-  virtual bool initialize();
-  virtual void start();
-  virtual void stop();
-  virtual ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape);
-  virtual void forgetShape(ShapeHandle handle);
+  bool initialize() override;
+  void start() override;
+  void stop() override;
+  ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape) override;
+  void forgetShape(ShapeHandle handle) override;
 
 protected:
   virtual void updateMask(const sensor_msgs::PointCloud2& cloud, const Eigen::Vector3d& sensor_origin,
                           std::vector<int>& mask);
 
 private:
-  bool getShapeTransform(ShapeHandle h, Eigen::Affine3d& transform) const;
+  bool getShapeTransform(ShapeHandle h, Eigen::Isometry3d& transform) const;
   void cloudMsgCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
   void stopHelper();
 
   ros::NodeHandle root_nh_;
   ros::NodeHandle private_nh_;
-  boost::shared_ptr<tf::Transformer> tf_;
+
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
   ros::Time last_update_time_;
 
@@ -86,10 +87,11 @@ private:
   unsigned int point_subsample_;
   double max_update_rate_;
   std::string filtered_cloud_topic_;
+  std::string ns_;
   ros::Publisher filtered_cloud_publisher_;
 
   message_filters::Subscriber<sensor_msgs::PointCloud2>* point_cloud_subscriber_;
-  tf::MessageFilter<sensor_msgs::PointCloud2>* point_cloud_filter_;
+  tf2_ros::MessageFilter<sensor_msgs::PointCloud2>* point_cloud_filter_;
 
   /* used to store all cells in the map which a given ray passes through during raycasting.
      we cache this here because it dynamically pre-allocates a lot of memory in its contsructor */
@@ -98,6 +100,4 @@ private:
   std::unique_ptr<point_containment_filter::ShapeMask> shape_mask_;
   std::vector<int> mask_;
 };
-}
-
-#endif
+}  // namespace occupancy_map_monitor

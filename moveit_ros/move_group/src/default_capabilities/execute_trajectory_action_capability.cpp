@@ -50,11 +50,9 @@ MoveGroupExecuteTrajectoryAction::MoveGroupExecuteTrajectoryAction() : MoveGroup
 void MoveGroupExecuteTrajectoryAction::initialize()
 {
   // start the move action server
-  execute_action_server_.reset(new actionlib::SimpleActionServer<moveit_msgs::ExecuteTrajectoryAction>(
-      root_node_handle_, EXECUTE_ACTION_NAME,
-      boost::bind(&MoveGroupExecuteTrajectoryAction::executePathCallback, this, _1), false));
-  execute_action_server_->registerPreemptCallback(
-      boost::bind(&MoveGroupExecuteTrajectoryAction::preemptExecuteTrajectoryCallback, this));
+  execute_action_server_ = std::make_unique<actionlib::SimpleActionServer<moveit_msgs::ExecuteTrajectoryAction>>(
+      root_node_handle_, EXECUTE_ACTION_NAME, [this](const auto& goal) { executePathCallback(goal); }, false);
+  execute_action_server_->registerPreemptCallback([this] { preemptExecuteTrajectoryCallback(); });
   execute_action_server_->start();
 }
 
@@ -91,7 +89,7 @@ void MoveGroupExecuteTrajectoryAction::executePathCallback(const moveit_msgs::Ex
 void MoveGroupExecuteTrajectoryAction::executePath(const moveit_msgs::ExecuteTrajectoryGoalConstPtr& goal,
                                                    moveit_msgs::ExecuteTrajectoryResult& action_res)
 {
-  ROS_INFO_NAMED(capability_name_, "Execution request received");
+  ROS_INFO_NAMED(getName(), "Execution request received");
 
   context_->trajectory_execution_manager_->clear();
   if (context_->trajectory_execution_manager_->push(goal->trajectory))
@@ -115,7 +113,7 @@ void MoveGroupExecuteTrajectoryAction::executePath(const moveit_msgs::ExecuteTra
     {
       action_res.error_code.val = moveit_msgs::MoveItErrorCodes::CONTROL_FAILED;
     }
-    ROS_INFO_STREAM_NAMED(capability_name_, "Execution completed: " << status.asString());
+    ROS_INFO_STREAM_NAMED(getName(), "Execution completed: " << status.asString());
   }
   else
   {

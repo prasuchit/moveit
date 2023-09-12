@@ -1,41 +1,42 @@
 /*********************************************************************
-* Software License Agreement (BSD License)
-*
-*  Copyright (c) 2013, Ioan A. Sucan
-*  Copyright (c) 2008-2013, Willow Garage, Inc.
-*  All rights reserved.
-*
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
-*
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of the Willow Garage nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
-*
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
-*********************************************************************/
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2013, Ioan A. Sucan
+ *  Copyright (c) 2008-2013, Willow Garage, Inc.
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the Willow Garage nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 /* Author: Ioan Sucan */
 
 #include <moveit/robot_model/floating_joint_model.h>
+#include <geometric_shapes/check_isometry.h>
 #include <boost/math/constants/constants.hpp>
 #include <ros/console.h>
 #include <limits>
@@ -45,6 +46,12 @@ namespace moveit
 {
 namespace core
 {
+namespace
+{
+constexpr size_t STATE_SPACE_DIMENSION = 7;
+
+}  // namespace
+
 FloatingJointModel::FloatingJointModel(const std::string& name) : JointModel(name), angular_distance_weight_(1.0)
 {
   type_ = FLOATING;
@@ -55,7 +62,7 @@ FloatingJointModel::FloatingJointModel(const std::string& name) : JointModel(nam
   local_variable_names_.push_back("rot_y");
   local_variable_names_.push_back("rot_z");
   local_variable_names_.push_back("rot_w");
-  for (int i = 0; i < 7; ++i)
+  for (size_t i = 0; i < STATE_SPACE_DIMENSION; ++i)
   {
     variable_names_.push_back(name_ + "/" + local_variable_names_[i]);
     variable_index_map_[variable_names_.back()] = i;
@@ -158,17 +165,17 @@ bool FloatingJointModel::satisfiesPositionBounds(const double* values, const Bou
     return false;
   if (values[2] < bounds[2].min_position_ - margin || values[2] > bounds[2].max_position_ + margin)
     return false;
-  double normSqr = values[3] * values[3] + values[4] * values[4] + values[5] * values[5] + values[6] * values[6];
-  return fabs(normSqr - 1.0) <= std::numeric_limits<float>::epsilon() * 10.0;
+  double norm_sqr = values[3] * values[3] + values[4] * values[4] + values[5] * values[5] + values[6] * values[6];
+  return fabs(norm_sqr - 1.0) <= std::numeric_limits<float>::epsilon() * 10.0;
 }
 
 bool FloatingJointModel::normalizeRotation(double* values) const
 {
   // normalize the quaternion if we need to
-  double normSqr = values[3] * values[3] + values[4] * values[4] + values[5] * values[5] + values[6] * values[6];
-  if (fabs(normSqr - 1.0) > std::numeric_limits<double>::epsilon() * 100.0)
+  double norm_sqr = values[3] * values[3] + values[4] * values[4] + values[5] * values[5] + values[6] * values[6];
+  if (fabs(norm_sqr - 1.0) > std::numeric_limits<double>::epsilon() * 100.0)
   {
-    double norm = sqrt(normSqr);
+    double norm = sqrt(norm_sqr);
     if (norm < std::numeric_limits<double>::epsilon() * 100.0)
     {
       ROS_WARN_NAMED("robot_model", "Quaternion is zero in RobotState representation. Setting to identity");
@@ -192,7 +199,7 @@ bool FloatingJointModel::normalizeRotation(double* values) const
 
 unsigned int FloatingJointModel::getStateSpaceDimension() const
 {
-  return 6;
+  return STATE_SPACE_DIMENSION;
 }
 
 bool FloatingJointModel::enforcePositionBounds(double* values, const Bounds& bounds) const
@@ -214,19 +221,20 @@ bool FloatingJointModel::enforcePositionBounds(double* values, const Bounds& bou
   return result;
 }
 
-void FloatingJointModel::computeTransform(const double* joint_values, Eigen::Affine3d& transf) const
+void FloatingJointModel::computeTransform(const double* joint_values, Eigen::Isometry3d& transf) const
 {
-  transf = Eigen::Affine3d(
+  transf = Eigen::Isometry3d(
       Eigen::Translation3d(joint_values[0], joint_values[1], joint_values[2]) *
-      Eigen::Quaterniond(joint_values[6], joint_values[3], joint_values[4], joint_values[5]).toRotationMatrix());
+      Eigen::Quaterniond(joint_values[6], joint_values[3], joint_values[4], joint_values[5]).normalized());
 }
 
-void FloatingJointModel::computeVariablePositions(const Eigen::Affine3d& transf, double* joint_values) const
+void FloatingJointModel::computeVariablePositions(const Eigen::Isometry3d& transf, double* joint_values) const
 {
   joint_values[0] = transf.translation().x();
   joint_values[1] = transf.translation().y();
   joint_values[2] = transf.translation().z();
-  Eigen::Quaterniond q(transf.rotation());
+  ASSERT_ISOMETRY(transf)  // unsanitized input, could contain non-isometry
+  Eigen::Quaterniond q(transf.linear());
   joint_values[3] = q.x();
   joint_values[4] = q.y();
   joint_values[5] = q.z();
@@ -278,27 +286,27 @@ void FloatingJointModel::getVariableRandomPositions(random_numbers::RandomNumber
 }
 
 void FloatingJointModel::getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values,
-                                                          const Bounds& bounds, const double* near,
+                                                          const Bounds& bounds, const double* seed,
                                                           const double distance) const
 {
   if (bounds[0].max_position_ >= std::numeric_limits<double>::infinity() ||
       bounds[0].min_position_ <= -std::numeric_limits<double>::infinity())
     values[0] = 0.0;
   else
-    values[0] = rng.uniformReal(std::max(bounds[0].min_position_, near[0] - distance),
-                                std::min(bounds[0].max_position_, near[0] + distance));
+    values[0] = rng.uniformReal(std::max(bounds[0].min_position_, seed[0] - distance),
+                                std::min(bounds[0].max_position_, seed[0] + distance));
   if (bounds[1].max_position_ >= std::numeric_limits<double>::infinity() ||
       bounds[1].min_position_ <= -std::numeric_limits<double>::infinity())
     values[1] = 0.0;
   else
-    values[1] = rng.uniformReal(std::max(bounds[1].min_position_, near[1] - distance),
-                                std::min(bounds[1].max_position_, near[1] + distance));
+    values[1] = rng.uniformReal(std::max(bounds[1].min_position_, seed[1] - distance),
+                                std::min(bounds[1].max_position_, seed[1] + distance));
   if (bounds[2].max_position_ >= std::numeric_limits<double>::infinity() ||
       bounds[2].min_position_ <= -std::numeric_limits<double>::infinity())
     values[2] = 0.0;
   else
-    values[2] = rng.uniformReal(std::max(bounds[2].min_position_, near[2] - distance),
-                                std::min(bounds[2].max_position_, near[2] + distance));
+    values[2] = rng.uniformReal(std::max(bounds[2].min_position_, seed[2] - distance),
+                                std::min(bounds[2].max_position_, seed[2] + distance));
 
   double da = angular_distance_weight_ * distance;
   if (da >= .25 * boost::math::constants::pi<double>())
@@ -335,10 +343,10 @@ void FloatingJointModel::getVariableRandomPositionsNearBy(random_numbers::Random
       q[3] = cos(angle / 2.0);
     }
     // multiply quaternions: near * q
-    values[3] = near[6] * q[0] + near[3] * q[3] + near[4] * q[2] - near[5] * q[1];
-    values[4] = near[6] * q[1] + near[4] * q[3] + near[5] * q[0] - near[3] * q[2];
-    values[5] = near[6] * q[2] + near[5] * q[3] + near[3] * q[1] - near[4] * q[0];
-    values[6] = near[6] * q[3] - near[3] * q[0] - near[4] * q[1] - near[5] * q[2];
+    values[3] = seed[6] * q[0] + seed[3] * q[3] + seed[4] * q[2] - seed[5] * q[1];
+    values[4] = seed[6] * q[1] + seed[4] * q[3] + seed[5] * q[0] - seed[3] * q[2];
+    values[5] = seed[6] * q[2] + seed[5] * q[3] + seed[3] * q[1] - seed[4] * q[0];
+    values[6] = seed[6] * q[3] - seed[3] * q[0] - seed[4] * q[1] - seed[5] * q[2];
   }
 }
 

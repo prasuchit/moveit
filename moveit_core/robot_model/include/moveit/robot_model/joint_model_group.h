@@ -1,42 +1,41 @@
 /*********************************************************************
-* Software License Agreement (BSD License)
-*
-*  Copyright (c) 2013, Ioan A. Sucan
-*  Copyright (c) 2008-2013, Willow Garage, Inc.
-*  All rights reserved.
-*
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
-*
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of Willow Garage, Inc. nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
-*
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
-*********************************************************************/
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2013, Ioan A. Sucan
+ *  Copyright (c) 2008-2013, Willow Garage, Inc.
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of Willow Garage, Inc. nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_CORE_ROBOT_MODEL_JOINT_MODEL_GROUP_
-#define MOVEIT_CORE_ROBOT_MODEL_JOINT_MODEL_GROUP_
+#pragma once
 
 #include <moveit/robot_model/joint_model.h>
 #include <moveit/robot_model/link_model.h>
@@ -56,22 +55,22 @@ class JointModelGroup;
 typedef boost::function<kinematics::KinematicsBasePtr(const JointModelGroup*)> SolverAllocatorFn;
 
 /** \brief Map from group instances to allocator functions & bijections */
-typedef std::map<const JointModelGroup*, SolverAllocatorFn> SolverAllocatorMapFn;
+using SolverAllocatorMapFn = std::map<const JointModelGroup*, SolverAllocatorFn>;
 
 /** \brief Map of names to instances for JointModelGroup */
-typedef std::map<std::string, JointModelGroup*> JointModelGroupMap;
+using JointModelGroupMap = std::map<std::string, JointModelGroup*>;
 
 /** \brief Map of names to const instances for JointModelGroup */
-typedef std::map<std::string, const JointModelGroup*> JointModelGroupMapConst;
+using JointModelGroupMapConst = std::map<std::string, const JointModelGroup*>;
 
-typedef std::vector<const JointModel::Bounds*> JointBoundsVector;
+using JointBoundsVector = std::vector<const JointModel::Bounds*>;
 
 class JointModelGroup
 {
 public:
   struct KinematicsSolver
   {
-    KinematicsSolver() : default_ik_timeout_(0.5), default_ik_attempts_(2)
+    KinematicsSolver() : default_ik_timeout_(0.5)
     {
     }
 
@@ -84,7 +83,6 @@ public:
     void reset()
     {
       solver_instance_.reset();
-      solver_instance_const_.reset();
       bijection_.clear();
     }
 
@@ -98,17 +96,13 @@ public:
         i in the kinematic solver. */
     std::vector<unsigned int> bijection_;
 
-    kinematics::KinematicsBaseConstPtr solver_instance_const_;
-
     kinematics::KinematicsBasePtr solver_instance_;
 
     double default_ik_timeout_;
-
-    unsigned int default_ik_attempts_;
   };
 
   /// Map from group instances to allocator functions & bijections
-  typedef std::map<const JointModelGroup*, KinematicsSolver> KinematicsSolverMap;
+  using KinematicsSolverMap = std::map<const JointModelGroup*, KinematicsSolver>;
 
   JointModelGroup(const std::string& name, const srdf::Model::Group& config,
                   const std::vector<const JointModel*>& joint_vector, const RobotModel* parent_model);
@@ -334,34 +328,40 @@ public:
   }
 
   /** \brief Compute random values for the state of the joint group */
-  void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values, const double* near,
+  void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values, const double* seed,
                                         const double distance) const
   {
-    getVariableRandomPositionsNearBy(rng, values, active_joint_models_bounds_, near, distance);
+    getVariableRandomPositionsNearBy(rng, values, active_joint_models_bounds_, seed, distance);
   }
   /** \brief Compute random values for the state of the joint group */
   void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, std::vector<double>& values,
-                                        const std::vector<double>& near, double distance) const
+                                        const std::vector<double>& seed, double distance) const
   {
     values.resize(variable_count_);
-    getVariableRandomPositionsNearBy(rng, &values[0], active_joint_models_bounds_, &near[0], distance);
+    getVariableRandomPositionsNearBy(rng, &values[0], active_joint_models_bounds_, &seed[0], distance);
   }
 
   /** \brief Compute random values for the state of the joint group */
   void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, std::vector<double>& values,
-                                        const std::vector<double>& near,
+                                        const std::vector<double>& seed,
                                         const std::map<JointModel::JointType, double>& distance_map) const
   {
     values.resize(variable_count_);
-    getVariableRandomPositionsNearBy(rng, &values[0], active_joint_models_bounds_, &near[0], distance_map);
+    getVariableRandomPositionsNearBy(rng, &values[0], active_joint_models_bounds_, &seed[0], distance_map);
   }
 
   /** \brief Compute random values for the state of the joint group */
+  void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values, const double* seed,
+                                        const std::vector<double>& distances) const
+  {
+    getVariableRandomPositionsNearBy(rng, values, active_joint_models_bounds_, seed, distances);
+  }
+  /** \brief Compute random values for the state of the joint group */
   void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, std::vector<double>& values,
-                                        const std::vector<double>& near, const std::vector<double>& distances) const
+                                        const std::vector<double>& seed, const std::vector<double>& distances) const
   {
     values.resize(variable_count_);
-    getVariableRandomPositionsNearBy(rng, &values[0], active_joint_models_bounds_, &near[0], distances);
+    getVariableRandomPositionsNearBy(rng, &values[0], active_joint_models_bounds_, &seed[0], distances);
   }
 
   void getVariableRandomPositions(random_numbers::RandomNumberGenerator& rng, double* values,
@@ -369,17 +369,17 @@ public:
 
   /** \brief Compute random values for the state of the joint group */
   void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values,
-                                        const JointBoundsVector& active_joint_bounds, const double* near,
+                                        const JointBoundsVector& active_joint_bounds, const double* seed,
                                         const double distance) const;
 
   /** \brief Compute random values for the state of the joint group */
   void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values,
-                                        const JointBoundsVector& active_joint_bounds, const double* near,
+                                        const JointBoundsVector& active_joint_bounds, const double* seed,
                                         const std::map<JointModel::JointType, double>& distance_map) const;
 
   /** \brief Compute random values for the state of the joint group */
   void getVariableRandomPositionsNearBy(random_numbers::RandomNumberGenerator& rng, double* values,
-                                        const JointBoundsVector& active_joint_bounds, const double* near,
+                                        const JointBoundsVector& active_joint_bounds, const double* seed,
                                         const std::vector<double>& distances) const;
 
   bool enforcePositionBounds(double* state) const
@@ -409,6 +409,13 @@ public:
   unsigned int getVariableCount() const
   {
     return variable_count_;
+  }
+
+  /** \brief Get the number of variables that describe the active joints in this joint group. This excludes variables
+      necessary for mimic joints. */
+  unsigned int getActiveVariableCount() const
+  {
+    return active_variable_count_;
   }
 
   /** \brief Set the names of the subgroups for this group */
@@ -483,8 +490,8 @@ public:
   }
 
   /**
-   * \brief Get a vector of end effector tips included in a particular joint model group as defined by the SRDF end
-   * effector semantic
+   * \brief Get the unique set of end effector tips included in a particular joint model group
+   * as defined by the SRDF end effector elements
    *        e.g. for a humanoid robot this would return 4 tips for the hands and feet
    * \param tips - the output vector of link models of the tips
    * \return true on success
@@ -492,8 +499,8 @@ public:
   bool getEndEffectorTips(std::vector<const LinkModel*>& tips) const;
 
   /**
-   * \brief Get a vector of end effector tips included in a particular joint model group as defined by the SRDF end
-   * effector semantic
+   * \brief Get the unique set of end effector tips included in a particular joint model group
+   * as defined by the SRDF end effector elements
    *        e.g. for a humanoid robot this would return 4 tips for the hands and feet
    * \param tips - the output vector of link names of the tips
    * \return true on success
@@ -526,9 +533,9 @@ public:
 
   void setSolverAllocators(const std::pair<SolverAllocatorFn, SolverAllocatorMapFn>& solvers);
 
-  const kinematics::KinematicsBaseConstPtr& getSolverInstance() const
+  const kinematics::KinematicsBaseConstPtr getSolverInstance() const
   {
-    return group_kinematics_.first.solver_instance_const_;
+    return group_kinematics_.first.solver_instance_;
   }
 
   const kinematics::KinematicsBasePtr& getSolverInstance()
@@ -554,15 +561,6 @@ public:
   /** \brief Set the default IK timeout */
   void setDefaultIKTimeout(double ik_timeout);
 
-  /** \brief Get the default IK attempts */
-  unsigned int getDefaultIKAttempts() const
-  {
-    return group_kinematics_.first.default_ik_attempts_;
-  }
-
-  /** \brief Set the default IK attempts */
-  void setDefaultIKAttempts(unsigned int ik_attempts);
-
   /** \brief Return the mapping between the order of the joints in this group and the order of the joints in the
      kinematics solver.
       An element bijection[i] at index \e i in this array, maps the variable at index bijection[i] in this group to
@@ -574,6 +572,14 @@ public:
 
   /** \brief Print information about the constructed model */
   void printGroupInfo(std::ostream& out = std::cout) const;
+
+  /** \brief Check that the time to move between two waypoints is sufficient given velocity limits */
+  bool isValidVelocityMove(const std::vector<double>& from_joint_pose, const std::vector<double>& to_joint_pose,
+                           double dt) const;
+
+  /** \brief Check that the time to move between two waypoints is sufficient given velocity limits */
+  bool isValidVelocityMove(const double* from_joint_pose, const double* to_joint_pose, std::size_t array_size,
+                           double dt) const;
 
 protected:
   bool computeIKIndexBijection(const std::vector<std::string>& ik_jnames,
@@ -695,6 +701,9 @@ protected:
   /** \brief The number of variables necessary to describe this group of joints */
   unsigned int variable_count_;
 
+  /** \brief The number of variables necessary to describe the active joints in this group of joints */
+  unsigned int active_variable_count_;
+
   /** \brief True if the state of this group is contiguous within the full robot state; this also means that
       the index values in variable_index_list_ are consecutive integers */
   bool is_contiguous_index_list_;
@@ -743,7 +752,5 @@ protected:
   /** \brief The names of the default states specified for this group in the SRDF */
   std::vector<std::string> default_states_names_;
 };
-}
-}
-
-#endif
+}  // namespace core
+}  // namespace moveit

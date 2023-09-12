@@ -35,18 +35,23 @@
 
 // SA
 #include "perception_widget.h"
+#include "header_widget.h"
 
 // Qt
-#include <QVBoxLayout>
-#include <QFormLayout>
 #include <QApplication>
+#include <QComboBox>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QLabel>
+#include <QLineEdit>
+#include <QVBoxLayout>
 
 namespace moveit_setup_assistant
 {
 // ******************************************************************************************
 // Constructor
 // ******************************************************************************************
-PerceptionWidget::PerceptionWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data)
+PerceptionWidget::PerceptionWidget(QWidget* parent, const MoveItConfigDataPtr& config_data)
   : SetupScreenWidget(parent), config_data_(config_data)
 {
   // Basic widget container
@@ -55,14 +60,14 @@ PerceptionWidget::PerceptionWidget(QWidget* parent, moveit_setup_assistant::Move
 
   // Top Header Area ------------------------------------------------
 
-  HeaderWidget* header = new HeaderWidget("3D Perception Sensor Configuration",
-                                          "Configure your 3D sensors to work with Moveit! "
-                                          "Please see <a "
-                                          "href='http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/"
-                                          "perception_configuration/"
-                                          "perception_configuration_tutorial.html'>Perception Documentation</a> "
-                                          "for more details.",
-                                          this);
+  HeaderWidget* header =
+      new HeaderWidget("Setup 3D Perception Sensors",
+                       "Configure your 3D sensors to work with MoveIt "
+                       "Please see <a "
+                       "href='http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/perception_pipeline/"
+                       "perception_pipeline_tutorial.html'>Perception Documentation</a> "
+                       "for more details.",
+                       this);
   layout->addWidget(header);
 
   // Add spacing
@@ -89,7 +94,6 @@ PerceptionWidget::PerceptionWidget(QWidget* parent, moveit_setup_assistant::Move
   // Point Cloud Topic
   point_cloud_topic_field_ = new QLineEdit(this);
   point_cloud_topic_field_->setMaximumWidth(400);
-  // point_cloud_topic_field_->setText(QString("/clud topic"));
   point_cloud_form_layout->addRow("Point Cloud Topic:", point_cloud_topic_field_);
 
   // Max Range
@@ -203,13 +207,14 @@ bool PerceptionWidget::focusLost()
   // Save the sensor plugin configuration to sensors_plugin_config data structure
   if (sensor_plugin_field_->currentIndex() == 1)
   {
-    // Point Cloud plugin feilds
+    config_data_->clearSensorPluginConfig();
+
+    // Point Cloud plugin fields
     config_data_->addGenericParameterToSensorPluginConfig("sensor_plugin", "occupancy_map_monitor/"
                                                                            "PointCloudOctomapUpdater");
     config_data_->addGenericParameterToSensorPluginConfig("point_cloud_topic",
                                                           point_cloud_topic_field_->text().trimmed().toStdString());
-    config_data_->addGenericParameterToSensorPluginConfig("max_range",
-                                                          max_range_field_->text().trimmed().toStdString());
+    config_data_->addGenericParameterToSensorPluginConfig("max_range", max_range_field_->text().trimmed().toStdString());
     config_data_->addGenericParameterToSensorPluginConfig("point_subsample",
                                                           point_subsample_field_->text().trimmed().toStdString());
     config_data_->addGenericParameterToSensorPluginConfig("padding_offset",
@@ -225,7 +230,9 @@ bool PerceptionWidget::focusLost()
   }
   else if (sensor_plugin_field_->currentIndex() == 2)
   {
-    // Depth Map plugin feilds
+    config_data_->clearSensorPluginConfig();
+
+    // Depth Map plugin fields
     config_data_->addGenericParameterToSensorPluginConfig("sensor_plugin", "occupancy_map_monitor/"
                                                                            "DepthImageOctomapUpdater");
     config_data_->addGenericParameterToSensorPluginConfig("image_topic",
@@ -280,61 +287,62 @@ void PerceptionWidget::sensorPluginChanged(int index)
   }
 }
 
+uint PerceptionWidget::loadConfigIntoWidgets(std::map<std::string, GenericParameter> sensor_plugin_config)
+{
+  if (sensor_plugin_config["sensor_plugin"].getValue() == "occupancy_map_monitor/PointCloudOctomapUpdater")
+  {
+    point_cloud_topic_field_->setText(QString(sensor_plugin_config["point_cloud_topic"].getValue().c_str()));
+    max_range_field_->setText(QString(sensor_plugin_config["max_range"].getValue().c_str()));
+    point_subsample_field_->setText(QString(sensor_plugin_config["point_subsample"].getValue().c_str()));
+    padding_offset_field_->setText(QString(sensor_plugin_config["padding_offset"].getValue().c_str()));
+    padding_scale_field_->setText(QString(sensor_plugin_config["padding_scale"].getValue().c_str()));
+    max_update_rate_field_->setText(QString(sensor_plugin_config["max_update_rate"].getValue().c_str()));
+    filtered_cloud_topic_field_->setText(QString(sensor_plugin_config["filtered_cloud_topic"].getValue().c_str()));
+    return 1;
+  }
+  else if (sensor_plugin_config["sensor_plugin"].getValue() == "occupancy_map_monitor/DepthImageOctomapUpdater")
+  {
+    image_topic_field_->setText(QString(sensor_plugin_config["image_topic"].getValue().c_str()));
+    queue_size_field_->setText(QString(sensor_plugin_config["queue_size"].getValue().c_str()));
+    near_clipping_field_->setText(QString(sensor_plugin_config["near_clipping_plane_distance"].getValue().c_str()));
+    far_clipping_field_->setText(QString(sensor_plugin_config["far_clipping_plane_distance"].getValue().c_str()));
+    shadow_threshold_field_->setText(QString(sensor_plugin_config["shadow_threshold"].getValue().c_str()));
+    depth_padding_scale_field_->setText(QString(sensor_plugin_config["padding_scale"].getValue().c_str()));
+    depth_padding_offset_field_->setText(QString(sensor_plugin_config["padding_offset"].getValue().c_str()));
+    depth_filtered_cloud_topic_field_->setText(QString(sensor_plugin_config["filtered_cloud_topic"].getValue().c_str()));
+    depth_max_update_rate_field_->setText(QString(sensor_plugin_config["max_update_rate"].getValue().c_str()));
+    return 2;
+  }
+  return 0;
+}
+
 void PerceptionWidget::loadSensorPluginsComboBox()
 {
   // Only load this combo box once
-  static bool hasLoaded = false;
-  if (hasLoaded)
+  static bool has_loaded = false;
+  if (has_loaded)
     return;
-  hasLoaded = true;
-
-  // Remove all old items
-  sensor_plugin_field_->clear();
+  has_loaded = true;
 
   // Add None option, the default
   sensor_plugin_field_->addItem("None");
+  sensor_plugin_field_->setCurrentIndex(0);
 
   // Add the two avilable plugins to combo box
   sensor_plugin_field_->addItem("Point Cloud");
   sensor_plugin_field_->addItem("Depth Map");
 
-  // Load deafult config, or use the one in the config package if exists
-  std::vector<std::map<std::string, GenericParameter> > sensors_vec_map = config_data_->getSensorPluginConfig();
-  for (std::size_t i = 0; i < sensors_vec_map.size(); ++i)
-  {
-    if (sensors_vec_map[i]["sensor_plugin"].getValue() == std::string("occupancy_map_monitor/PointCloudOctomapUpdater"))
-    {
-      sensor_plugin_field_->setCurrentIndex(1);
-      point_cloud_topic_field_->setText(QString(sensors_vec_map[i]["point_cloud_topic"].getValue().c_str()));
-      max_range_field_->setText(QString(sensors_vec_map[i]["max_range"].getValue().c_str()));
-      point_subsample_field_->setText(QString(sensors_vec_map[i]["point_subsample"].getValue().c_str()));
-      padding_offset_field_->setText(QString(sensors_vec_map[i]["padding_offset"].getValue().c_str()));
-      padding_scale_field_->setText(QString(sensors_vec_map[i]["padding_scale"].getValue().c_str()));
-      max_update_rate_field_->setText(QString(sensors_vec_map[i]["max_update_rate"].getValue().c_str()));
-      filtered_cloud_topic_field_->setText(QString(sensors_vec_map[i]["filtered_cloud_topic"].getValue().c_str()));
-    }
-    else if (sensors_vec_map[i]["sensor_plugin"].getValue() ==
-             std::string("occupancy_map_monitor/DepthImageOctomapUpdater"))
-    {
-      sensor_plugin_field_->setCurrentIndex(2);
-      image_topic_field_->setText(QString(sensors_vec_map[i]["image_topic"].getValue().c_str()));
-      queue_size_field_->setText(QString(sensors_vec_map[i]["queue_size"].getValue().c_str()));
-      near_clipping_field_->setText(QString(sensors_vec_map[i]["near_clipping_plane_distance"].getValue().c_str()));
-      far_clipping_field_->setText(QString(sensors_vec_map[i]["far_clipping_plane_distance"].getValue().c_str()));
-      shadow_threshold_field_->setText(QString(sensors_vec_map[i]["shadow_threshold"].getValue().c_str()));
-      depth_padding_scale_field_->setText(QString(sensors_vec_map[i]["padding_scale"].getValue().c_str()));
-      depth_padding_offset_field_->setText(QString(sensors_vec_map[i]["padding_offset"].getValue().c_str()));
-      depth_filtered_cloud_topic_field_->setText(
-          QString(sensors_vec_map[i]["filtered_cloud_topic"].getValue().c_str()));
-      depth_max_update_rate_field_->setText(QString(sensors_vec_map[i]["max_update_rate"].getValue().c_str()));
-    }
-  }
+  // Load values from default config
+  auto default_config = MoveItConfigData::load3DSensorsYAML(
+      config_data_->setup_assistant_path_ + "/templates/moveit_config_pkg_template/config/sensors_3d.yaml");
+  for (const auto& sensor_plugin_config : default_config)
+    loadConfigIntoWidgets(sensor_plugin_config);
 
-  // If no sensor config exists, default to None
-  if (sensors_vec_map.size() == 2)
-  {
-    sensor_plugin_field_->setCurrentIndex(0);
-  }
+  // Load values from existing config
+  uint idx = 0;
+  for (const auto& sensor_plugin_config : config_data_->getSensorPluginConfig())
+    idx = loadConfigIntoWidgets(sensor_plugin_config);
+  sensor_plugin_field_->setCurrentIndex(idx);
 }
 
-}  // namespace
+}  // namespace moveit_setup_assistant

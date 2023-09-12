@@ -2,7 +2,99 @@
 Changelog for package moveit_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.9.12 (2018-05-29)
+1.1.13 (2023-07-28)
+-------------------
+
+1.1.12 (2023-05-13)
+-------------------
+
+1.1.11 (2022-12-21)
+-------------------
+
+1.1.10 (2022-09-13)
+-------------------
+
+1.1.9 (2022-03-06)
+------------------
+
+1.1.8 (2022-01-30)
+------------------
+
+1.1.7 (2021-12-31)
+------------------
+
+1.1.6 (2021-11-06)
+------------------
+
+1.1.5 (2021-05-23)
+------------------
+
+1.1.4 (2021-05-12)
+------------------
+
+1.1.3 (2021-04-29)
+------------------
+
+1.1.2 (2021-04-08)
+------------------
+
+1.1.1 (2020-10-13)
+------------------
+
+1.1.0 (2020-09-04)
+------------------
+* [maint] Use standard cmake text for metapackages (`#1620 <https://github.com/ros-planning/moveit/issues/1620>`_)
+* [maint] Use CMAKE_CXX_STANDARD to enforce c++14 for portability (`#1607 <https://github.com/ros-planning/moveit/issues/1607>`_)
+* [maint] Remove ! from MoveIt name (`#1590 <https://github.com/ros-planning/moveit/issues/1590>`_)
+* Contributors: Dave Coleman, Jonathan Binney, Robert Haschke, Sean Yen
+
+1.0.6 (2020-08-19)
+------------------
+
+1.0.5 (2020-07-08)
+------------------
+
+1.0.4 (2020-05-30)
+------------------
+
+1.0.3 (2020-04-26)
+------------------
+
+1.0.2 (2019-06-28)
+------------------
+
+1.0.1 (2019-03-08)
+------------------
+
+1.0.0 (2019-02-24)
+------------------
+* [fix] catkin_lint issues (`#1341 <https://github.com/ros-planning/moveit/issues/1341>`_)
+* Contributors: Dave Coleman, Robert Haschke
+
+0.10.8 (2018-12-24)
+-------------------
+
+0.10.7 (2018-12-13)
+-------------------
+
+0.10.6 (2018-12-09)
+-------------------
+
+0.10.5 (2018-11-01)
+-------------------
+
+0.10.4 (2018-10-29)
+-------------------
+
+0.10.3 (2018-10-29)
+-------------------
+
+0.10.2 (2018-10-24)
+-------------------
+* Fix references to MoveIt (`#1020 <https://github.com/ros-planning/moveit/issues/1020>`_)
+* Contributors: Mohmmad Ayman
+
+0.10.1 (2018-05-25)
 -------------------
 
 0.9.11 (2017-12-25)
@@ -45,7 +137,7 @@ Changelog for package moveit_ros
 
 0.6.5 (2015-01-24)
 ------------------
-* update maintainers
+* Update maintainers
 * Contributors: Michael Ferguson
 
 0.6.4 (2014-12-20)
@@ -92,8 +184,8 @@ Changelog for package moveit_ros
 
 0.5.9 (2013-12-03)
 ------------------
-* update email addresses
-* correcting maintainer email
+* Update email addresses
+* Correcting maintainer email
 
 0.5.8 (2013-10-11)
 ------------------

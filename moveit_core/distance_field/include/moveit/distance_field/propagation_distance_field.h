@@ -34,13 +34,11 @@
 
 /* Author: Mrinal Kalakrishnan, Ken Anderson */
 
-#ifndef MOVEIT_DISTANCE_FIELD_PROPAGATION_DISTANCE_FIELD_
-#define MOVEIT_DISTANCE_FIELD_PROPAGATION_DISTANCE_FIELD_
+#pragma once
 
 #include <moveit/distance_field/voxel_grid.h>
 #include <moveit/distance_field/distance_field.h>
 #include <vector>
-#include <list>
 #include <Eigen/Core>
 #include <set>
 #include <octomap/octomap.h>
@@ -56,7 +54,7 @@ namespace distance_field
  * \brief Struct for sorting type Eigen::Vector3i for use in sorted
  * std containers.  Sorts in z order, then y order, then x order.
  */
-struct compareEigen_Vector3i
+struct CompareEigenVector3i
 {
   bool operator()(const Eigen::Vector3i& loc_1, const Eigen::Vector3i& loc_2) const
   {
@@ -221,7 +219,7 @@ public:
    *
    *
    */
-  virtual ~PropagationDistanceField()
+  ~PropagationDistanceField() override
   {
   }
 
@@ -238,7 +236,7 @@ public:
    *
    * @param [in] points The set of obstacle points to add
    */
-  virtual void addPointsToField(const EigenSTL::vector_Vector3d& points);
+  void addPointsToField(const EigenSTL::vector_Vector3d& points) override;
 
   /**
    * \brief Remove a set of obstacle points from the distance field,
@@ -259,7 +257,7 @@ public:
    *
    * @param [in] points The set of obstacle points that will be set as free
    */
-  virtual void removePointsFromField(const EigenSTL::vector_Vector3d& points);
+  void removePointsFromField(const EigenSTL::vector_Vector3d& points) override;
 
   /**
    * \brief This function will remove any obstacle points that are in
@@ -283,15 +281,15 @@ public:
    * @param [in] new_points The set of points, all of which are intended to be obstacle points in the distance field
    *
    */
-  virtual void updatePointsInField(const EigenSTL::vector_Vector3d& old_points,
-                                   const EigenSTL::vector_Vector3d& new_points);
+  void updatePointsInField(const EigenSTL::vector_Vector3d& old_points,
+                           const EigenSTL::vector_Vector3d& new_points) override;
 
   /**
    * \brief Resets the entire distance field to max_distance for
    * positive values and zero for negative values.
    *
    */
-  virtual void reset();
+  void reset() override;
 
   /**
    * \brief Get the distance value associated with the cell indicated
@@ -308,7 +306,7 @@ public:
    *
    * @return The distance value
    */
-  virtual double getDistance(double x, double y, double z) const;
+  double getDistance(double x, double y, double z) const override;
 
   /**
    * \brief Get the distance value associated with the cell indicated
@@ -325,14 +323,14 @@ public:
    *
    * @return The distance value for the cell
    */
-  virtual double getDistance(int x, int y, int z) const;
+  double getDistance(int x, int y, int z) const override;
 
-  virtual bool isCellValid(int x, int y, int z) const;
-  virtual int getXNumCells() const;
-  virtual int getYNumCells() const;
-  virtual int getZNumCells() const;
-  virtual bool gridToWorld(int x, int y, int z, double& world_x, double& world_y, double& world_z) const;
-  virtual bool worldToGrid(double world_x, double world_y, double world_z, int& x, int& y, int& z) const;
+  bool isCellValid(int x, int y, int z) const override;
+  int getXNumCells() const override;
+  int getYNumCells() const override;
+  int getZNumCells() const override;
+  bool gridToWorld(int x, int y, int z, double& world_x, double& world_y, double& world_z) const override;
+  bool worldToGrid(double world_x, double world_y, double world_z, int& x, int& y, int& z) const override;
 
   /**
    * \brief Writes the contents of the distance field to the supplied stream.
@@ -350,7 +348,7 @@ public:
    *
    * @return True
    */
-  virtual bool writeToStream(std::ostream& stream) const;
+  bool writeToStream(std::ostream& stream) const override;
 
   /**
    * \brief Reads, parameterizes, and populates the distance field
@@ -368,10 +366,10 @@ public:
    * @return True if reading, parameterizing, and populating the
    * distance field is successful; otherwise False.
    */
-  virtual bool readFromStream(std::istream& stream);
+  bool readFromStream(std::istream& stream) override;
 
   // passthrough docs to DistanceField
-  virtual double getUninitializedDistance() const
+  double getUninitializedDistance() const override
   {
     return max_distance_;
   }
@@ -418,20 +416,20 @@ public:
       dist = sqrt_table_[cell->distance_square_];
       pos = cell->closest_point_;
       const PropDistanceFieldVoxel* ncell = &voxel_grid_->getCell(pos.x(), pos.y(), pos.z());
-      return ncell == cell ? NULL : ncell;
+      return ncell == cell ? nullptr : ncell;
     }
     if (cell->negative_distance_square_ > 0)
     {
       dist = -sqrt_table_[cell->negative_distance_square_];
       pos = cell->closest_negative_point_;
       const PropDistanceFieldVoxel* ncell = &voxel_grid_->getCell(pos.x(), pos.y(), pos.z());
-      return ncell == cell ? NULL : ncell;
+      return ncell == cell ? nullptr : ncell;
     }
     dist = 0.0;
     pos.x() = x;
     pos.y() = y;
     pos.z() = z;
-    return NULL;
+    return nullptr;
   }
 
   /**
@@ -449,7 +447,7 @@ public:
 
 private:
   /** Typedef for set of integer indices */
-  typedef std::set<Eigen::Vector3i, compareEigen_Vector3i, Eigen::aligned_allocator<Eigen::Vector3i>> VoxelSet;
+  typedef std::set<Eigen::Vector3i, CompareEigenVector3i, Eigen::aligned_allocator<Eigen::Vector3i>> VoxelSet;
   /**
    * \brief Initializes the field, resetting the voxel grid and
    * building a sqrt lookup table for efficiency based on
@@ -540,16 +538,6 @@ private:
    */
   void print(const EigenSTL::vector_Vector3d& points);
 
-  /**
-   * \brief Computes squared distance between two 3D integer points
-   *
-   * @param point1 Point 1 for distance
-   * @param point2 Point 2 for distance
-   *
-   * @return Distance between points squared
-   */
-  static int eucDistSq(Eigen::Vector3i point1, Eigen::Vector3i point2);
-
   bool propagate_negative_; /**< \brief Whether or not to propagate negative distances */
 
   VoxelGrid<PropDistanceFieldVoxel>::Ptr voxel_grid_; /**< \brief Actual container for distance data */
@@ -610,6 +598,4 @@ inline double PropagationDistanceField::getDistance(const PropDistanceFieldVoxel
 {
   return sqrt_table_[object.distance_square_] - sqrt_table_[object.negative_distance_square_];
 }
-}
-
-#endif
+}  // namespace distance_field

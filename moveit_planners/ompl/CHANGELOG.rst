@@ -2,12 +2,155 @@
 Changelog for package moveit_planners_ompl
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.9.12 (2018-05-29)
+1.1.13 (2023-07-28)
 -------------------
-* forward OMPL logging to rosconsole (`#916 <https://github.com/ros-planning/moveit/issues/916>`_)
+
+1.1.12 (2023-05-13)
+-------------------
+* Add AITstar, BITstar and ABITstar planners from OMPL >= 1.5 (`#3347 <https://github.com/ros-planning/moveit/issues/3347>`_)
+* Differential drive for planar Joints (`#3359 <https://github.com/ros-planning/moveit/issues/3359>`_)
+* Fix (some) doxygen warnings (`#3315 <https://github.com/ros-planning/moveit/issues/3315>`_)
+* Contributors: Robert Haschke, Scott Chow, alaflaquiere
+
+1.1.11 (2022-12-21)
+-------------------
+* Improve processing of multiple planning attempts: skip remaining planning attempts if solution was found (`#3261 <https://github.com/ros-planning/moveit/issues/3261>`_)
+* Convert OMPL status to ``MoveItErrorCode`` in the OMPL interface (`#3257 <https://github.com/ros-planning/moveit/issues/3257>`_)
+* Contributors: AndyZe, Robert Haschke
+
+1.1.10 (2022-09-13)
+-------------------
+* Remove ConstraintSampler::project() (`#3170 <https://github.com/ros-planning/moveit/issues/3170>`_)
+* Replace bind() with lambdas (`#3106 <https://github.com/ros-planning/moveit/issues/3106>`_)
+* Cleanup OMPL's PlanningContextManager's protected API
+* planning_context_manager: rename protected methods
+* Contributors: Michael Görner, Robert Haschke
+
+1.1.9 (2022-03-06)
+------------------
+
+1.1.8 (2022-01-30)
+------------------
+
+1.1.7 (2021-12-31)
+------------------
+* Use termination condition for simplification step (`#2981 <https://github.com/ros-planning/moveit/issues/2981>`_)
+* Switch to ``std::bind`` (`#2967 <https://github.com/ros-planning/moveit/issues/2967>`_)
+* Contributors: Jochen Sprickerhof, Simon Schmeisser
+
+1.1.6 (2021-11-06)
+------------------
+* Use newly introduced cmake macro ``moveit_build_options()`` from ``moveit_core``
+* Fix ConstrainedGoalSampler (`#2811 <https://github.com/ros-planning/moveit/issues/2811>`_): actually call ``sample()`` (`#2872 <https://github.com/ros-planning/moveit/issues/2872>`_)
+* Provide override for missing isValid method (`#2802 <https://github.com/ros-planning/moveit/issues/2802>`_)
+* Add missing dependencies to generated dynamic_reconfigure headers (`#2772 <https://github.com/ros-planning/moveit/issues/2772>`_)
+* clang-tidy: modernize-make-shared, modernize-make-unique (`#2762 <https://github.com/ros-planning/moveit/issues/2762>`_)
+* Contributors: Mathias Lüdtke, Michael Görner, Robert Haschke, pvanlaar, v4hn, werner291
+
+1.1.5 (2021-05-23)
+------------------
+
+1.1.4 (2021-05-12)
+------------------
+
+1.1.3 (2021-04-29)
+------------------
+
+1.1.2 (2021-04-08)
+------------------
+* Fix formatting errors
+* Replaced eigen+kdl conversions with tf2_eigen + tf2_kdl (`#2472 <https://github.com/ros-planning/moveit/issues/2472>`_)
+* Add test to ompl interface for StateValidityChecker (`#2247 <https://github.com/ros-planning/moveit/issues/2247>`_)
+* Add test for PlanningContextManager in ompl interface (`#2248 <https://github.com/ros-planning/moveit/issues/2248>`_)
+* Contributors: Jeroen, Tyler Weaver, petkovich
+
+1.1.1 (2020-10-13)
+------------------
+* [maint] Add comment to MOVEIT_CLASS_FORWARD (`#2315 <https://github.com/ros-planning/moveit/issues/2315>`_)
+* Contributors: Felix von Drigalski
+
+1.1.0 (2020-09-04)
+------------------
+
+1.0.6 (2020-08-19)
+------------------
+* [maint] Adapt repository for splitted moveit_resources layout (`#2199 <https://github.com/ros-planning/moveit/issues/2199>`_)
+* [maint] Migrate to clang-format-10
+* [maint] Optimize includes (`#2229 <https://github.com/ros-planning/moveit/issues/2229>`_)
+* [fix]   Fix memcpy bug in copyJointToOMPLState in ompl interface (`#2239 <https://github.com/ros-planning/moveit/issues/2239>`_)
+* Contributors: Jeroen, Markus Vieth, Robert Haschke, Michael Görner
+
+1.0.5 (2020-07-08)
+------------------
+* [feature] Added support for hybridize/interpolate flags in ModelBasedPlanningContext via ompl_planning.yaml (`#2171 <https://github.com/ros-planning/moveit/issues/2171>`_, `#2172 <https://github.com/ros-planning/moveit/issues/2172>`_)
+* Contributors: Constantinos, Mark Moll
+
+1.0.4 (2020-05-30)
+------------------
+
+1.0.3 (2020-04-26)
+------------------
+* [maint] Cleanup OMPL dynamic reconfigure config (`#1649 <https://github.com/ros-planning/moveit/issues/1649>`_)
+  * Reduce minimum number of waypoints in solution to 2
+* [maint] Apply clang-tidy fix to entire code base (`#1394 <https://github.com/ros-planning/moveit/issues/1394>`_)
+* [maint] Fix errors: catkin_lint 1.6.7 (`#1987 <https://github.com/ros-planning/moveit/issues/1987>`_)
+* [maint] Windows build: Fix binary artifact install locations. (`#1575 <https://github.com/ros-planning/moveit/issues/1575>`_)
+* [maint] Use CMAKE_CXX_STANDARD to enforce c++14 (`#1607 <https://github.com/ros-planning/moveit/issues/1607>`_)
+* Contributors: Michael Görner, Robert Haschke, Sean Yen, Yu, Yan
+
+1.0.2 (2019-06-28)
+------------------
+
+1.0.1 (2019-03-08)
+------------------
+* [improve] Apply clang tidy fix to entire code base (Part 1) (`#1366 <https://github.com/ros-planning/moveit/issues/1366>`_)
+* Contributors: Robert Haschke, Yu, Yan
+
+1.0.0 (2019-02-24)
+------------------
+* [fix] catkin_lint issues (`#1341 <https://github.com/ros-planning/moveit/issues/1341>`_)
+* Contributors: Dave Coleman, Robert Haschke
+
+0.10.8 (2018-12-24)
+-------------------
+
+0.10.7 (2018-12-13)
+-------------------
+
+0.10.6 (2018-12-09)
+-------------------
+* [fix] Fixed memory leak in OMPL planner (`#1104 <https://github.com/ros-planning/moveit/issues/1104>`_)
+  * Resolve circular reference to ompl::geometric::SimpleSetupPtr
+* [maintenance] Use C++14 (`#1146 <https://github.com/ros-planning/moveit/issues/1146>`_)
+* [maintenance] Code Cleanup
+  * `#1179 <https://github.com/ros-planning/moveit/issues/1179>`_
+  * `#1196 <https://github.com/ros-planning/moveit/issues/1196>`_
+* Contributors: Alex Moriarty, Dave Coleman, Robert Haschke
+
+0.10.5 (2018-11-01)
+-------------------
+* [fix] Build regression (`#1174 <https://github.com/ros-planning/moveit/issues/1174>`_)
+* Contributors: Chris Lalancette
+
+0.10.4 (2018-10-29)
+-------------------
+
+0.10.3 (2018-10-29)
+-------------------
+* [maintenance] Use locale independent conversion from double to string (`#1099 <https://github.com/ros-planning/moveit/issues/1099>`_)
+* Contributors: Simon Schmeisser
+
+0.10.2 (2018-10-24)
+-------------------
+* [capability] adaptions for OMPL 1.4 (`#903 <https://github.com/ros-planning/moveit/issues/903>`_)
+* Contributors: Dave Coleman, Michael Görner, Mikael Arguedas, Mohmmad Ayman, Robert Haschke, mike lautman
+
+0.10.1 (2018-05-25)
+-------------------
+* migration from tf to tf2 API (`#830 <https://github.com/ros-planning/moveit/issues/830>`_)
 * switch to ROS_LOGGER from CONSOLE_BRIDGE (`#874 <https://github.com/ros-planning/moveit/issues/874>`_)
 * Make trajectory interpolation in MoveIt consistent to OMPL (`#869 <https://github.com/ros-planning/moveit/issues/869>`_)
-* Contributors: Bryce Willey, Ian McMahon, Mikael Arguedas, Robert Haschke, Xiaojian Ma, Zachary Kingston
+* Contributors: Bryce Willey, Ian McMahon, Mikael Arguedas, Robert Haschke, Xiaojian Ma
 
 0.9.11 (2017-12-25)
 -------------------
@@ -73,7 +216,7 @@ Changelog for package moveit_planners_ompl
 * renamed newGoal to new_goal for keeping with formatting
 * setting GroupStateValidityCallbackFn member for constraint_sampler member and implementing callbacks for state validity checking
 * added functions to check validit of state, and also to act as callback for constraint sampler
-* Added copy function from MoveIt! robot_state joint values to ompl state
+* Added copy function from MoveIt robot_state joint values to ompl state
 * fix for demo constraints database linking error
 * Namespaced less useful debug output to allow to be easily silenced using ros console
 * Contributors: Dave Coleman, Dave Hershberger, Sachin Chitta, arjungm

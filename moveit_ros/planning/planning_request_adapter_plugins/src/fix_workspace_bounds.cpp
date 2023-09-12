@@ -45,9 +45,13 @@ class FixWorkspaceBounds : public planning_request_adapter::PlanningRequestAdapt
 public:
   static const std::string WBOUNDS_PARAM_NAME;
 
-  FixWorkspaceBounds() : planning_request_adapter::PlanningRequestAdapter(), nh_("~")
+  FixWorkspaceBounds() : planning_request_adapter::PlanningRequestAdapter()
   {
-    if (!nh_.getParam(WBOUNDS_PARAM_NAME, workspace_extent_))
+  }
+
+  void initialize(const ros::NodeHandle& nh) override
+  {
+    if (!nh.getParam(WBOUNDS_PARAM_NAME, workspace_extent_))
     {
       workspace_extent_ = 10.0;
       ROS_INFO_STREAM("Param '" << WBOUNDS_PARAM_NAME << "' was not set. Using default value: " << workspace_extent_);
@@ -57,15 +61,14 @@ public:
     workspace_extent_ /= 2.0;
   }
 
-  virtual std::string getDescription() const
+  std::string getDescription() const override
   {
     return "Fix Workspace Bounds";
   }
 
-  virtual bool adaptAndPlan(const PlannerFn& planner, const planning_scene::PlanningSceneConstPtr& planning_scene,
-                            const planning_interface::MotionPlanRequest& req,
-                            planning_interface::MotionPlanResponse& res,
-                            std::vector<std::size_t>& added_path_index) const
+  bool adaptAndPlan(const PlannerFn& planner, const planning_scene::PlanningSceneConstPtr& planning_scene,
+                    const planning_interface::MotionPlanRequest& req, planning_interface::MotionPlanResponse& res,
+                    std::vector<std::size_t>& /*added_path_index*/) const override
   {
     ROS_DEBUG("Running '%s'", getDescription().c_str());
     const moveit_msgs::WorkspaceParameters& wparams = req.workspace_parameters;
@@ -85,12 +88,11 @@ public:
   }
 
 private:
-  ros::NodeHandle nh_;
   double workspace_extent_;
 };
 
 const std::string FixWorkspaceBounds::WBOUNDS_PARAM_NAME = "default_workspace_bounds";
-}
+}  // namespace default_planner_request_adapters
 
 CLASS_LOADER_REGISTER_CLASS(default_planner_request_adapters::FixWorkspaceBounds,
                             planning_request_adapter::PlanningRequestAdapter);

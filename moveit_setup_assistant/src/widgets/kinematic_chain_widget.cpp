@@ -41,7 +41,8 @@
 #include <QGridLayout>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QString>
+#include <QLabel>
+#include <QTreeWidget>
 #include "kinematic_chain_widget.h"
 
 namespace moveit_setup_assistant
@@ -49,7 +50,7 @@ namespace moveit_setup_assistant
 // ******************************************************************************************
 // Constructor
 // ******************************************************************************************
-KinematicChainWidget::KinematicChainWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data)
+KinematicChainWidget::KinematicChainWidget(QWidget* parent, const MoveItConfigDataPtr& config_data)
   : QWidget(parent), config_data_(config_data)
 {
   // Basic widget container
@@ -108,9 +109,7 @@ KinematicChainWidget::KinematicChainWidget(QWidget* parent, moveit_setup_assista
   controls_layout->addWidget(expand_controls);
 
   // Spacer
-  QWidget* spacer = new QWidget(this);
-  spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  controls_layout->addWidget(spacer);
+  controls_layout->addItem(new QSpacerItem(20, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
   // Save
   QPushButton* btn_save = new QPushButton("&Save", this);
@@ -146,12 +145,12 @@ void KinematicChainWidget::setAvailable()
     return;
 
   // Retrieve pointer to the shared kinematic model
-  const robot_model::RobotModelConstPtr& model = config_data_->getRobotModel();
+  const moveit::core::RobotModelConstPtr& model = config_data_->getRobotModel();
 
   // Get the root joint
-  const robot_model::JointModel* root_joint = model->getRootJoint();
+  const moveit::core::JointModel* root_joint = model->getRootJoint();
 
-  addLinktoTreeRecursive(root_joint->getChildLinkModel(), NULL);
+  addLinktoTreeRecursive(root_joint->getChildLinkModel(), nullptr);
 
   // Remember that we have loaded the chain
   kinematic_chain_loaded_ = true;
@@ -160,14 +159,14 @@ void KinematicChainWidget::setAvailable()
 // ******************************************************************************************
 //
 // ******************************************************************************************
-void KinematicChainWidget::addLinktoTreeRecursive(const robot_model::LinkModel* link,
-                                                  const robot_model::LinkModel* parent)
+void KinematicChainWidget::addLinktoTreeRecursive(const moveit::core::LinkModel* link,
+                                                  const moveit::core::LinkModel* parent)
 {
   // Create new tree item
   QTreeWidgetItem* new_item = new QTreeWidgetItem(link_tree_);
 
   // Add item to tree
-  if (parent == NULL)
+  if (parent == nullptr)
   {
     new_item->setText(0, link->getName().c_str());
     link_tree_->addTopLevelItem(new_item);
@@ -182,7 +181,7 @@ void KinematicChainWidget::addLinktoTreeRecursive(const robot_model::LinkModel* 
       }
     }
   }
-  for (size_t i = 0; i < link->getChildJointModels().size(); i++)
+  for (std::size_t i = 0; i < link->getChildJointModels().size(); i++)
   {
     addLinktoTreeRecursive(link->getChildJointModels()[i]->getChildLinkModel(), link);
   }
@@ -191,7 +190,7 @@ void KinematicChainWidget::addLinktoTreeRecursive(const robot_model::LinkModel* 
 // ******************************************************************************************
 //
 // ******************************************************************************************
-bool KinematicChainWidget::addLinkChildRecursive(QTreeWidgetItem* parent, const robot_model::LinkModel* link,
+bool KinematicChainWidget::addLinkChildRecursive(QTreeWidgetItem* parent, const moveit::core::LinkModel* link,
                                                  const std::string& parent_name)
 {
   if (parent->text(0).toStdString() == parent_name)
@@ -231,7 +230,7 @@ void KinematicChainWidget::setSelected(const std::string& base_link, const std::
 void KinematicChainWidget::baseLinkTreeClick()
 {
   QTreeWidgetItem* item = link_tree_->currentItem();
-  if (item != NULL)
+  if (item != nullptr)
   {
     base_link_field_->setText(item->text(0));
   }
@@ -243,7 +242,7 @@ void KinematicChainWidget::baseLinkTreeClick()
 void KinematicChainWidget::tipLinkTreeClick()
 {
   QTreeWidgetItem* item = link_tree_->currentItem();
-  if (item != NULL)
+  if (item != nullptr)
   {
     tip_link_field_->setText(item->text(0));
   }
@@ -266,7 +265,7 @@ void KinematicChainWidget::alterTree(const QString& link)
 void KinematicChainWidget::itemSelected()
 {
   QTreeWidgetItem* item = link_tree_->currentItem();
-  if (item != NULL)
+  if (item != nullptr)
   {
     Q_EMIT unhighlightAll();
 
@@ -280,4 +279,4 @@ void KinematicChainWidget::itemSelected()
     Q_EMIT highlightLink(item->text(0).toStdString(), QColor(255, 0, 0));
   }
 }
-}
+}  // namespace moveit_setup_assistant

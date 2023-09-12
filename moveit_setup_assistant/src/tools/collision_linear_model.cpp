@@ -39,8 +39,7 @@
 
 #include <QItemSelection>
 #include <QPainter>
-
-using namespace moveit_setup_assistant;
+#include <cmath>
 
 CollisionLinearModel::CollisionLinearModel(CollisionMatrixModel* src, QObject* parent) : QAbstractProxyModel(parent)
 {
@@ -77,71 +76,66 @@ QModelIndex CollisionLinearModel::mapToSource(const QModelIndex& proxyIndex) con
   return sourceModel()->index(r, c);
 }
 
-int CollisionLinearModel::rowCount(const QModelIndex& parent) const
+int CollisionLinearModel::rowCount(const QModelIndex& /*parent*/) const
 {
   int n = this->sourceModel()->rowCount();
   return (n * (n - 1) / 2);
 }
 
-int CollisionLinearModel::columnCount(const QModelIndex& parent) const
+int CollisionLinearModel::columnCount(const QModelIndex& /*parent*/) const
 {
   return 4;
 }
 
-QModelIndex CollisionLinearModel::index(int row, int column, const QModelIndex& parent) const
+QModelIndex CollisionLinearModel::index(int row, int column, const QModelIndex& /*parent*/) const
 {
   return createIndex(row, column);
 }
 
-QModelIndex CollisionLinearModel::parent(const QModelIndex& child) const
+QModelIndex CollisionLinearModel::parent(const QModelIndex& /*child*/) const
 {
   return QModelIndex();
 }
 
 QVariant CollisionLinearModel::data(const QModelIndex& index, int role) const
 {
-  QModelIndex srcIndex = this->mapToSource(index);
+  QModelIndex src_index = this->mapToSource(index);
   switch (index.column())
   {
     case 0:  // link name 1
       if (role != Qt::DisplayRole)
         return QVariant();
       else
-        return this->sourceModel()->headerData(srcIndex.row(), Qt::Horizontal, Qt::DisplayRole);
+        return this->sourceModel()->headerData(src_index.row(), Qt::Horizontal, Qt::DisplayRole);
     case 1:  // link name 2
       if (role != Qt::DisplayRole)
         return QVariant();
-      return this->sourceModel()->headerData(srcIndex.column(), Qt::Vertical, Qt::DisplayRole);
+      return this->sourceModel()->headerData(src_index.column(), Qt::Vertical, Qt::DisplayRole);
     case 2:  // checkbox
       if (role != Qt::CheckStateRole)
         return QVariant();
       else
-        return this->sourceModel()->data(srcIndex, Qt::CheckStateRole);
+        return this->sourceModel()->data(src_index, Qt::CheckStateRole);
     case 3:  // reason
       if (role != Qt::DisplayRole)
         return QVariant();
       else
-        return this->sourceModel()->data(srcIndex, Qt::ToolTipRole);
+        return this->sourceModel()->data(src_index, Qt::ToolTipRole);
   }
   return QVariant();
 }
 
-DisabledReason CollisionLinearModel::reason(int row) const
-{
-  QModelIndex srcIndex = this->mapToSource(index(row, 0));
-  return qobject_cast<CollisionMatrixModel*>(sourceModel())->reason(srcIndex);
-}
-
 bool CollisionLinearModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
-  QModelIndex srcIndex = this->mapToSource(index);
-
   if (role == Qt::CheckStateRole)
   {
-    sourceModel()->setData(srcIndex, value, role);
-    int r = index.row();
-    Q_EMIT dataChanged(this->index(r, 2), this->index(r, 3));  // reason changed too
-    return true;
+    QModelIndex src_index = this->mapToSource(index);
+    if (sourceModel()->setData(src_index, value, role))
+    {
+      int r = index.row();
+      Q_EMIT dataChanged(this->index(r, 2), this->index(r, 3));  // reason changed too
+      return true;
+    }
   }
   return false;  // reject all other changes
 }
@@ -238,8 +232,7 @@ void SortFilterProxyModel::setShowAll(bool show_all)
 bool SortFilterProxyModel::filterAcceptsRow(int source_row, const QModelIndex& source_parent) const
 {
   CollisionLinearModel* m = qobject_cast<CollisionLinearModel*>(sourceModel());
-  if (!(show_all_ || m->reason(source_row) <= moveit_setup_assistant::ALWAYS ||
-        m->data(m->index(source_row, 2), Qt::CheckStateRole) == Qt::Checked))
+  if (!(show_all_ || m->data(m->index(source_row, 2), Qt::CheckStateRole) == Qt::Checked))
     return false;  // not accepted due to check state
 
   const QRegExp regexp = this->filterRegExp();
@@ -261,7 +254,7 @@ bool operator<(const QVariant& left, const QVariant& right)
   else
     return left.toString() < right.toString();
 }
-}
+}  // namespace
 #endif
 
 bool SortFilterProxyModel::lessThan(const QModelIndex& src_left, const QModelIndex& src_right) const
@@ -280,7 +273,16 @@ bool SortFilterProxyModel::lessThan(const QModelIndex& src_left, const QModelInd
     if (value_left == value_right)
       continue;
 
-    bool smaller = (value_left < value_right);
+    bool smaller{};
+    switch (value_left.type())
+    {
+      case QVariant::Int:
+        smaller = value_left.toInt() < value_right.toInt();
+        break;
+      default:
+        smaller = value_left.toString() < value_right.toString();
+        break;
+    }
     if (sort_orders_[i] == Qt::DescendingOrder)
       smaller = !smaller;
     return smaller;

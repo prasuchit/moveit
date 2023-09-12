@@ -33,22 +33,18 @@
 
 /* Author: Mohamad Ayman */
 
-#ifndef MOVEIT_MOVEIT_SETUP_ASSISTANT_WIDGETS_PERCEPTION_WIDGET_
-#define MOVEIT_MOVEIT_SETUP_ASSISTANT_WIDGETS_PERCEPTION_WIDGET_
+#pragma once
 
 // Qt
-#include <QWidget>
-#include <QComboBox>
-#include <QGroupBox>
-#include <QString>
-#include <QLineEdit>
+class QComboBox;
+class QGroupBox;
+class QLineEdit;
 
 // SA
 #ifndef Q_MOC_RUN
 #include <moveit/setup_assistant/tools/moveit_config_data.h>
 #endif
 
-#include "header_widget.h"
 #include "setup_screen_widget.h"  // a base class for screens in the setup assistant
 
 namespace moveit_setup_assistant
@@ -65,16 +61,17 @@ public:
   // Public Functions
   // ******************************************************************************************
 
-  PerceptionWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data);
+  PerceptionWidget(QWidget* parent, const MoveItConfigDataPtr& config_data);
 
   /// Received when this widget is chosen from the navigation menu
-  virtual void focusGiven();
+  void focusGiven() override;
 
   /// Received when another widget is chosen from the navigation menu
-  virtual bool focusLost();
+  bool focusLost() override;
 
   /// Populate the combo dropdown box with sensor plugins
   void loadSensorPluginsComboBox();
+  uint loadConfigIntoWidgets(std::map<std::string, GenericParameter> sensor_plugin_config);
 
   // ******************************************************************************************
   // Qt Components
@@ -125,5 +122,3 @@ private:
 };
 
 }  // namespace moveit_setup_assistant
-
-#endif

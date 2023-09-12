@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_CONSTRAINT_SAMPLERS_DEFAULT_CONSTRAINT_SAMPLERS_
-#define MOVEIT_CONSTRAINT_SAMPLERS_DEFAULT_CONSTRAINT_SAMPLERS_
+#pragma once
 
 #include <moveit/constraint_samplers/constraint_sampler.h>
 #include <moveit/macros/class_forward.h>
@@ -43,7 +42,9 @@
 
 namespace constraint_samplers
 {
-MOVEIT_CLASS_FORWARD(JointConstraintSampler);
+random_numbers::RandomNumberGenerator createSeededRNG(const std::string& seed_param);
+
+MOVEIT_CLASS_FORWARD(JointConstraintSampler);  // Defines JointConstraintSamplerPtr, ConstPtr, WeakPtr... etc
 
 /**
  * \brief JointConstraintSampler is a class that allows the sampling
@@ -69,8 +70,10 @@ public:
    */
   JointConstraintSampler(const planning_scene::PlanningSceneConstPtr& scene, const std::string& group_name)
     : ConstraintSampler(scene, group_name)
+    , random_number_generator_(createSeededRNG("~joint_constraint_sampler_random_seed"))
   {
   }
+
   /**
    * \brief Configures a joint constraint given a Constraints message.
    *
@@ -88,7 +91,7 @@ public:
    *
    * @return True if the conditions are met, otherwise false
    */
-  virtual bool configure(const moveit_msgs::Constraints& constr);
+  bool configure(const moveit_msgs::Constraints& constr) override;
 
   /**
    * \brief Configures a joint constraint given a vector of constraints.
@@ -117,9 +120,7 @@ public:
    */
   bool configure(const std::vector<kinematic_constraints::JointConstraint>& jc);
 
-  virtual bool sample(robot_state::RobotState& state, const robot_state::RobotState& ks, unsigned int max_attempts);
-
-  virtual bool project(robot_state::RobotState& state, unsigned int max_attempts);
+  bool sample(moveit::core::RobotState& state, const moveit::core::RobotState& ks, unsigned int max_attempts) override;
 
   /**
    * \brief Gets the number of constrained joints - joints that have an
@@ -149,7 +150,7 @@ public:
    * should be in CamelCase format.
    * \return string of name
    */
-  virtual const std::string& getName() const
+  const std::string& getName() const override
   {
     static const std::string SAMPLER_NAME = "JointConstraintSampler";
     return SAMPLER_NAME;
@@ -190,13 +191,13 @@ protected:
     std::size_t index_; /**< The index within the joint state vector for this joint */
   };
 
-  virtual void clear();
+  void clear() override;
 
   random_numbers::RandomNumberGenerator random_number_generator_; /**< \brief Random number generator used to sample */
   std::vector<JointInfo> bounds_; /**< \brief The bounds for any joint with bounds that are more restrictive than the
                                      joint limits */
 
-  std::vector<const robot_model::JointModel*> unbounded_; /**< \brief The joints that are not bounded except by joint
+  std::vector<const moveit::core::JointModel*> unbounded_; /**< \brief The joints that are not bounded except by joint
                                                              limits */
   std::vector<unsigned int> uindex_; /**< \brief The index of the unbounded joints in the joint state vector */
   std::vector<double> values_;       /**< \brief Values associated with this group to avoid continuously reallocating */
@@ -280,7 +281,7 @@ struct IKSamplingPose
       orientation_constraint_; /**< \brief Holds the orientation constraint for sampling */
 };
 
-MOVEIT_CLASS_FORWARD(IKConstraintSampler);
+MOVEIT_CLASS_FORWARD(IKConstraintSampler);  // Defines IKConstraintSamplerPtr, ConstPtr, WeakPtr... etc
 
 /**
  * \brief A class that allows the sampling of IK constraints.
@@ -305,6 +306,7 @@ public:
    */
   IKConstraintSampler(const planning_scene::PlanningSceneConstPtr& scene, const std::string& group_name)
     : ConstraintSampler(scene, group_name)
+    , random_number_generator_(createSeededRNG("~ik_constraint_sampler_random_seed"))
   {
   }
 
@@ -332,7 +334,7 @@ public:
    * exist and the overloaded configuration function returns true.
    * Otherwise, returns false.
    */
-  virtual bool configure(const moveit_msgs::Constraints& constr);
+  bool configure(const moveit_msgs::Constraints& constr) override;
 
   /**
    * \brief Configures the Constraint given a IKSamplingPose.
@@ -446,10 +448,9 @@ public:
    *
    * @return True if a valid sample pose was produced and valid IK found for that pose.  Otherwise false.
    */
-  virtual bool sample(robot_state::RobotState& state, const robot_state::RobotState& reference_state,
-                      unsigned int max_attempts);
+  bool sample(moveit::core::RobotState& state, const moveit::core::RobotState& reference_state,
+              unsigned int max_attempts) override;
 
-  virtual bool project(robot_state::RobotState& state, unsigned int max_attempts);
   /**
    * \brief Returns a pose that falls within the constraint regions.
    *
@@ -466,13 +467,13 @@ public:
    * Otherwise, a random quaternion is produced.
    *
    * @param [out] pos The position component of the sample
-   * @param [out] quat The orientation component of the sample
+   * @param [out] quat The orientation component of the sample. It will always be a normalized quaternion.
    * @param [in] ks The reference state used for performing transforms
    * @param [in] max_attempts The maximum attempts to try to sample - applies only to the position constraint
    *
    * @return True if a sample was successfully produced, otherwise false
    */
-  bool samplePose(Eigen::Vector3d& pos, Eigen::Quaterniond& quat, const robot_state::RobotState& ks,
+  bool samplePose(Eigen::Vector3d& pos, Eigen::Quaterniond& quat, const moveit::core::RobotState& ks,
                   unsigned int max_attempts);
 
   /**
@@ -480,14 +481,14 @@ public:
    * should be in CamelCase format.
    * \return string of name
    */
-  virtual const std::string& getName() const
+  const std::string& getName() const override
   {
     static const std::string SAMPLER_NAME = "IKConstraintSampler";
     return SAMPLER_NAME;
   }
 
 protected:
-  virtual void clear();
+  void clear() override;
 
   /**
    * \brief Performs checks and sets various internal values associated with the IK solver
@@ -509,10 +510,10 @@ protected:
    */
   bool callIK(const geometry_msgs::Pose& ik_query,
               const kinematics::KinematicsBase::IKCallbackFn& adapted_ik_validity_callback, double timeout,
-              robot_state::RobotState& state, bool use_as_seed);
-  bool sampleHelper(robot_state::RobotState& state, const robot_state::RobotState& reference_state,
-                    unsigned int max_attempts, bool project);
-  bool validate(robot_state::RobotState& state) const;
+              moveit::core::RobotState& state, bool use_as_seed);
+  bool sampleHelper(moveit::core::RobotState& state, const moveit::core::RobotState& reference_state,
+                    unsigned int max_attempts);
+  bool validate(moveit::core::RobotState& state) const;
 
   random_numbers::RandomNumberGenerator random_number_generator_; /**< \brief Random generator used by the sampler */
   IKSamplingPose sampling_pose_;                                  /**< \brief Holder for the pose used for sampling */
@@ -523,8 +524,6 @@ protected:
                          of the IK solver */
   bool need_eef_to_ik_tip_transform_; /**< \brief True if the tip frame of the inverse kinematic is different than the
                                         frame of the end effector */
-  Eigen::Affine3d eef_to_ik_tip_transform_; /**< \brief Holds the transformation from end effector to IK tip frame */
+  Eigen::Isometry3d eef_to_ik_tip_transform_; /**< \brief Holds the transformation from end effector to IK tip frame */
 };
-}
-
-#endif
+}  // namespace constraint_samplers

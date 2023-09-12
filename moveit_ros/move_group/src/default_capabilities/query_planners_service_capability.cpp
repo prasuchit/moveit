@@ -35,14 +35,17 @@
 /* Author: Ioan Sucan, Robert Haschke */
 
 #include "query_planners_service_capability.h"
+#include <moveit/moveit_cpp/moveit_cpp.h>
 #include <moveit/planning_pipeline/planning_pipeline.h>
 #include <moveit/move_group/capability_names.h>
 
-move_group::MoveGroupQueryPlannersService::MoveGroupQueryPlannersService() : MoveGroupCapability("QueryPlannersService")
+namespace move_group
+{
+MoveGroupQueryPlannersService::MoveGroupQueryPlannersService() : MoveGroupCapability("QueryPlannersService")
 {
 }
 
-void move_group::MoveGroupQueryPlannersService::initialize()
+void MoveGroupQueryPlannersService::initialize()
 {
   query_service_ = root_node_handle_.advertiseService(QUERY_PLANNERS_SERVICE_NAME,
                                                       &MoveGroupQueryPlannersService::queryInterface, this);
@@ -53,26 +56,36 @@ void move_group::MoveGroupQueryPlannersService::initialize()
                                                     &MoveGroupQueryPlannersService::setParams, this);
 }
 
-bool move_group::MoveGroupQueryPlannersService::queryInterface(moveit_msgs::QueryPlannerInterfaces::Request& req,
-                                                               moveit_msgs::QueryPlannerInterfaces::Response& res)
+bool MoveGroupQueryPlannersService::queryInterface(moveit_msgs::QueryPlannerInterfaces::Request& /*req*/,
+                                                   moveit_msgs::QueryPlannerInterfaces::Response& res)
 {
-  const planning_interface::PlannerManagerPtr& planner_interface = context_->planning_pipeline_->getPlannerManager();
-  if (planner_interface)
+  for (const auto& planning_pipelines : context_->moveit_cpp_->getPlanningPipelines())
   {
-    std::vector<std::string> algs;
-    planner_interface->getPlanningAlgorithms(algs);
-    moveit_msgs::PlannerInterfaceDescription pi_desc;
-    pi_desc.name = planner_interface->getDescription();
-    planner_interface->getPlanningAlgorithms(pi_desc.planner_ids);
-    res.planner_interfaces.push_back(pi_desc);
+    const auto& pipeline_id = planning_pipelines.first;
+    const auto& planning_pipeline = planning_pipelines.second;
+    const planning_interface::PlannerManagerPtr& planner_interface = planning_pipeline->getPlannerManager();
+    if (planner_interface)
+    {
+      std::vector<std::string> algs;
+      planner_interface->getPlanningAlgorithms(algs);
+      moveit_msgs::PlannerInterfaceDescription pi_desc;
+      pi_desc.name = planner_interface->getDescription();
+      pi_desc.pipeline_id = pipeline_id;
+      planner_interface->getPlanningAlgorithms(pi_desc.planner_ids);
+      res.planner_interfaces.push_back(pi_desc);
+    }
   }
   return true;
 }
 
-bool move_group::MoveGroupQueryPlannersService::getParams(moveit_msgs::GetPlannerParams::Request& req,
-                                                          moveit_msgs::GetPlannerParams::Response& res)
+bool MoveGroupQueryPlannersService::getParams(moveit_msgs::GetPlannerParams::Request& req,
+                                              moveit_msgs::GetPlannerParams::Response& res)
 {
-  const planning_interface::PlannerManagerPtr& planner_interface = context_->planning_pipeline_->getPlannerManager();
+  const planning_pipeline::PlanningPipelinePtr planning_pipeline = resolvePlanningPipeline(req.pipeline_id);
+  if (!planning_pipeline)
+    return false;
+
+  const planning_interface::PlannerManagerPtr& planner_interface = planning_pipeline->getPlannerManager();
   if (planner_interface)
   {
     std::map<std::string, std::string> config;
@@ -91,26 +104,31 @@ bool move_group::MoveGroupQueryPlannersService::getParams(moveit_msgs::GetPlanne
         config.insert(it->second.config.begin(), it->second.config.end());
     }
 
-    for (std::map<std::string, std::string>::const_iterator it = config.begin(), end = config.end(); it != end; ++it)
+    for (const auto& key_value_pair : config)
     {
-      res.params.keys.push_back(it->first);
-      res.params.values.push_back(it->second);
+      res.params.keys.push_back(key_value_pair.first);
+      res.params.values.push_back(key_value_pair.second);
     }
   }
   return true;
 }
 
-bool move_group::MoveGroupQueryPlannersService::setParams(moveit_msgs::SetPlannerParams::Request& req,
-                                                          moveit_msgs::SetPlannerParams::Response& res)
+bool MoveGroupQueryPlannersService::setParams(moveit_msgs::SetPlannerParams::Request& req,
+                                              moveit_msgs::SetPlannerParams::Response& /*res*/)
 {
-  const planning_interface::PlannerManagerPtr& planner_interface = context_->planning_pipeline_->getPlannerManager();
   if (req.params.keys.size() != req.params.values.size())
     return false;
+
+  const planning_pipeline::PlanningPipelinePtr planning_pipeline = resolvePlanningPipeline(req.pipeline_id);
+  if (!planning_pipeline)
+    return false;
+
+  const planning_interface::PlannerManagerPtr& planner_interface = planning_pipeline->getPlannerManager();
 
   if (planner_interface)
   {
     planning_interface::PlannerConfigurationMap configs = planner_interface->getPlannerConfigurations();
-    std::string config_name = req.group.empty() ? req.planner_config : req.group + "[" + req.planner_config + "]";
+    const std::string config_name = req.group.empty() ? req.planner_config : req.group + "[" + req.planner_config + "]";
 
     planning_interface::PlannerConfigurationSettings& config = configs[config_name];
     config.group = req.group;
@@ -124,6 +142,7 @@ bool move_group::MoveGroupQueryPlannersService::setParams(moveit_msgs::SetPlanne
   }
   return true;
 }
+}  // namespace move_group
 
 #include <class_loader/class_loader.hpp>
 CLASS_LOADER_REGISTER_CLASS(move_group::MoveGroupQueryPlannersService, move_group::MoveGroupCapability)

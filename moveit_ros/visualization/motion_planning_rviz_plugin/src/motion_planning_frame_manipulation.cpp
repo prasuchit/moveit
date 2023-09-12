@@ -41,6 +41,8 @@
 #include <moveit/robot_state/conversions.h>
 #include <object_recognition_msgs/ObjectRecognitionGoal.h>
 
+#include <tf2_eigen/tf2_eigen.h>
+
 #include "ui_motion_planning_rviz_plugin_frame.h"
 
 namespace moveit_rviz_plugin
@@ -53,22 +55,21 @@ void MotionPlanningFrame::detectObjectsButtonClicked()
     const planning_scene_monitor::LockedPlanningSceneRO& ps = planning_display_->getPlanningSceneRO();
     if (ps)
     {
-      semantic_world_.reset(new moveit::semantic_world::SemanticWorld(ps));
+      semantic_world_ = std::make_shared<moveit::semantic_world::SemanticWorld>(ps);
     }
     if (semantic_world_)
     {
-      semantic_world_->addTableCallback(boost::bind(&MotionPlanningFrame::updateTables, this));
+      semantic_world_->addTableCallback([this] { updateTables(); });
     }
   }
-  planning_display_->addBackgroundJob(boost::bind(&MotionPlanningFrame::triggerObjectDetection, this), "detect "
-                                                                                                       "objects");
+  planning_display_->addBackgroundJob([this] { triggerObjectDetection(); }, "detect objects");
 }
 
 void MotionPlanningFrame::processDetectedObjects()
 {
   pick_object_name_.clear();
 
-  std::vector<std::string> objects, object_ids;
+  std::vector<std::string> object_ids;
   double min_x = ui_->roi_center_x->value() - ui_->roi_size_x->value() / 2.0;
   double min_y = ui_->roi_center_y->value() - ui_->roi_size_y->value() / 2.0;
   double min_z = ui_->roi_center_z->value() - ui_->roi_size_z->value() / 2.0;
@@ -80,13 +81,28 @@ void MotionPlanningFrame::processDetectedObjects()
   ros::Time start_time = ros::Time::now();
   while (object_ids.empty() && ros::Time::now() - start_time <= ros::Duration(3.0))
   {
-    object_ids =
-        planning_scene_interface_->getKnownObjectNamesInROI(min_x, min_y, min_z, max_x, max_y, max_z, true, objects);
+    // collect all objects in region of interest
+    {
+      const planning_scene_monitor::LockedPlanningSceneRO& ps = planning_display_->getPlanningSceneRO();
+      const collision_detection::WorldConstPtr& world = ps->getWorld();
+      object_ids.clear();
+      for (const auto& object : *world)
+      {
+        const auto& position = object.second->pose_.translation();
+        if (position.x() >= min_x && position.x() <= max_x && position.y() >= min_y && position.y() <= max_y &&
+            position.z() >= min_z && position.z() <= max_z)
+        {
+          object_ids.push_back(object.first);
+        }
+      }
+      if (!object_ids.empty())
+        break;
+    }
     ros::Duration(0.5).sleep();
   }
 
   ROS_DEBUG("Found %d objects", (int)object_ids.size());
-  updateDetectedObjectsList(object_ids, objects);
+  updateDetectedObjectsList(object_ids);
 }
 
 void MotionPlanningFrame::selectedDetectedObjectChanged()
@@ -113,7 +129,7 @@ void MotionPlanningFrame::selectedDetectedObjectChanged()
   }
 }
 
-void MotionPlanningFrame::detectedObjectChanged(QListWidgetItem* item)
+void MotionPlanningFrame::detectedObjectChanged(QListWidgetItem* /*item*/)
 {
 }
 
@@ -121,12 +137,12 @@ void MotionPlanningFrame::triggerObjectDetection()
 {
   if (!object_recognition_client_)
   {
-    object_recognition_client_.reset(
-        new actionlib::SimpleActionClient<object_recognition_msgs::ObjectRecognitionAction>(OBJECT_RECOGNITION_ACTION,
-                                                                                            false));
+    object_recognition_client_ =
+        std::make_unique<actionlib::SimpleActionClient<object_recognition_msgs::ObjectRecognitionAction>>(
+            OBJECT_RECOGNITION_ACTION, false);
     try
     {
-      waitForAction(object_recognition_client_, nh_, ros::Duration(3.0), OBJECT_RECOGNITION_ACTION);
+      waitForAction(object_recognition_client_, ros::Duration(3.0), OBJECT_RECOGNITION_ACTION);
     }
     catch (std::exception& ex)
     {
@@ -147,17 +163,16 @@ void MotionPlanningFrame::triggerObjectDetection()
   }
 }
 
-void MotionPlanningFrame::listenDetectedObjects(const object_recognition_msgs::RecognizedObjectArrayPtr& msg)
+void MotionPlanningFrame::listenDetectedObjects(const object_recognition_msgs::RecognizedObjectArrayPtr& /*msg*/)
 {
   ros::Duration(1.0).sleep();
-  planning_display_->addMainLoopJob(boost::bind(&MotionPlanningFrame::processDetectedObjects, this));
+  planning_display_->addMainLoopJob([this] { processDetectedObjects(); });
 }
 
-void MotionPlanningFrame::updateDetectedObjectsList(const std::vector<std::string>& object_ids,
-                                                    const std::vector<std::string>& objects)
+void MotionPlanningFrame::updateDetectedObjectsList(const std::vector<std::string>& object_ids)
 {
   ui_->detected_objects_list->setUpdatesEnabled(false);
-  bool oldState = ui_->detected_objects_list->blockSignals(true);
+  bool old_state = ui_->detected_objects_list->blockSignals(true);
   ui_->detected_objects_list->clear();
   {
     for (std::size_t i = 0; i < object_ids.size(); ++i)
@@ -171,7 +186,7 @@ void MotionPlanningFrame::updateDetectedObjectsList(const std::vector<std::strin
       ui_->detected_objects_list->addItem(item);
     }
   }
-  ui_->detected_objects_list->blockSignals(oldState);
+  ui_->detected_objects_list->blockSignals(old_state);
   ui_->detected_objects_list->setUpdatesEnabled(true);
   if (!object_ids.empty())
     ui_->pick_button->setEnabled(true);
@@ -181,13 +196,13 @@ void MotionPlanningFrame::updateDetectedObjectsList(const std::vector<std::strin
 void MotionPlanningFrame::updateTables()
 {
   ROS_DEBUG("Update table callback");
-  planning_display_->addBackgroundJob(boost::bind(&MotionPlanningFrame::publishTables, this), "publish tables");
+  planning_display_->addBackgroundJob([this] { publishTables(); }, "publish tables");
 }
 
 void MotionPlanningFrame::publishTables()
 {
   semantic_world_->addTablesToCollisionWorld();
-  planning_display_->addMainLoopJob(boost::bind(&MotionPlanningFrame::updateSupportSurfacesList, this));
+  planning_display_->addMainLoopJob([this] { updateSupportSurfacesList(); });
 }
 
 void MotionPlanningFrame::selectedSupportSurfaceChanged()
@@ -227,7 +242,7 @@ void MotionPlanningFrame::updateSupportSurfacesList()
   ROS_INFO("%d Tables in collision world", (int)support_ids.size());
 
   ui_->support_surfaces_list->setUpdatesEnabled(false);
-  bool oldState = ui_->support_surfaces_list->blockSignals(true);
+  bool old_state = ui_->support_surfaces_list->blockSignals(true);
   ui_->support_surfaces_list->clear();
   {
     for (std::size_t i = 0; i < support_ids.size(); ++i)
@@ -241,7 +256,7 @@ void MotionPlanningFrame::updateSupportSurfacesList()
       ui_->support_surfaces_list->addItem(item);
     }
   }
-  ui_->support_surfaces_list->blockSignals(oldState);
+  ui_->support_surfaces_list->blockSignals(old_state);
   ui_->support_surfaces_list->setUpdatesEnabled(true);
 }
 
@@ -265,13 +280,12 @@ void MotionPlanningFrame::pickObjectButtonClicked()
   {
     if (semantic_world_)
     {
-      std::vector<std::string> object_names;
-      object_names.push_back(pick_object_name_[group_name]);
-      std::map<std::string, geometry_msgs::Pose> object_poses = planning_scene_interface_->getObjectPoses(object_names);
-      if (object_poses.find(pick_object_name_[group_name]) != object_poses.end())
+      const planning_scene_monitor::LockedPlanningSceneRO& ps = planning_display_->getPlanningSceneRO();
+      if (ps->getWorld()->hasObject(pick_object_name_[group_name]))
       {
-        ROS_DEBUG("Finding current table for object: %s", pick_object_name_[group_name].c_str());
-        support_surface_name_ = semantic_world_->findObjectTable(object_poses[pick_object_name_[group_name]]);
+        geometry_msgs::Pose object_pose(tf2::toMsg(ps->getWorld()->getTransform(pick_object_name_[group_name])));
+        ROS_DEBUG_STREAM("Finding current table for object: " << pick_object_name_[group_name]);
+        support_surface_name_ = semantic_world_->findObjectTable(object_pose);
       }
       else
         support_surface_name_.clear();
@@ -281,7 +295,7 @@ void MotionPlanningFrame::pickObjectButtonClicked()
   }
   ROS_INFO("Trying to pick up object %s from support surface %s", pick_object_name_[group_name].c_str(),
            support_surface_name_.c_str());
-  planning_display_->addBackgroundJob(boost::bind(&MotionPlanningFrame::pickObject, this), "pick");
+  planning_display_->addBackgroundJob([this] { pickObject(); }, "pick");
 }
 
 void MotionPlanningFrame::placeObjectButtonClicked()
@@ -301,14 +315,14 @@ void MotionPlanningFrame::placeObjectButtonClicked()
   ui_->pick_button->setEnabled(false);
   ui_->place_button->setEnabled(false);
 
-  std::vector<const robot_state::AttachedBody*> attached_bodies;
+  std::vector<const moveit::core::AttachedBody*> attached_bodies;
   const planning_scene_monitor::LockedPlanningSceneRO& ps = planning_display_->getPlanningSceneRO();
   if (!ps)
   {
     ROS_ERROR("No planning scene");
     return;
   }
-  const robot_model::JointModelGroup* jmg = ps->getCurrentState().getJointModelGroup(group_name);
+  const moveit::core::JointModelGroup* jmg = ps->getCurrentState().getJointModelGroup(group_name);
   if (jmg)
     ps->getCurrentState().getAttachedBodies(attached_bodies, jmg);
 
@@ -327,7 +341,7 @@ void MotionPlanningFrame::placeObjectButtonClicked()
                                                      upright_orientation, 0.1);
   planning_display_->visualizePlaceLocations(place_poses_);
   place_object_name_ = attached_bodies[0]->getName();
-  planning_display_->addBackgroundJob(boost::bind(&MotionPlanningFrame::placeObject, this), "place");
+  planning_display_->addBackgroundJob([this] { placeObject(); }, "place");
 }
 
 void MotionPlanningFrame::pickObject()
@@ -354,4 +368,4 @@ void MotionPlanningFrame::placeObject()
   move_group_->place(place_object_name_, place_poses_);
   return;
 }
-}
+}  // namespace moveit_rviz_plugin

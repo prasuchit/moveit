@@ -34,26 +34,25 @@
 
 /* Author: Ken Anderson */
 
-#ifndef MOVEIT_TRAJECTORY_PROCESSING_ITERATIVE_PARABOLIC_SMOOTHER_
-#define MOVEIT_TRAJECTORY_PROCESSING_ITERATIVE_PARABOLIC_SMOOTHER_
+#pragma once
 
-#include <trajectory_msgs/JointTrajectory.h>
-#include <moveit_msgs/JointLimits.h>
-#include <moveit_msgs/RobotState.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
+#include <moveit/trajectory_processing/time_parameterization.h>
 
 namespace trajectory_processing
 {
 /// \brief This class  modifies the timestamps of a trajectory to respect
 /// velocity and acceleration constraints.
-class IterativeParabolicTimeParameterization
+MOVEIT_CLASS_FORWARD(IterativeParabolicTimeParameterization);
+class IterativeParabolicTimeParameterization : public TimeParameterization
 {
 public:
   IterativeParabolicTimeParameterization(unsigned int max_iterations = 100, double max_time_change_per_it = .01);
-  ~IterativeParabolicTimeParameterization();
 
   bool computeTimeStamps(robot_trajectory::RobotTrajectory& trajectory, const double max_velocity_scaling_factor = 1.0,
-                         const double max_acceleration_scaling_factor = 1.0) const;
+                         const double max_acceleration_scaling_factor = 1.0) const override;
+
+  static void updateTrajectory(robot_trajectory::RobotTrajectory& rob_trajectory, const std::vector<double>& time_diff);
 
 private:
   unsigned int max_iterations_;    /// @brief maximum number of iterations to find solution
@@ -68,6 +67,5 @@ private:
   double findT1(const double d1, const double d2, double t1, const double t2, const double a_max) const;
   double findT2(const double d1, const double d2, const double t1, double t2, const double a_max) const;
 };
-}
 
-#endif
+}  // namespace trajectory_processing

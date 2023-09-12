@@ -36,6 +36,7 @@
 
 #include <moveit/rviz_plugin_render_tools/render_shapes.h>
 #include <moveit/rviz_plugin_render_tools/octomap_render.h>
+#include <geometric_shapes/check_isometry.h>
 #include <geometric_shapes/mesh_operations.h>
 
 #include <OgreSceneNode.h>
@@ -71,24 +72,16 @@ void RenderShapes::clear()
   octree_voxel_grids_.clear();
 }
 
-void RenderShapes::renderShape(Ogre::SceneNode* node, const shapes::Shape* s, const Eigen::Affine3d& p,
+void RenderShapes::renderShape(Ogre::SceneNode* node, const shapes::Shape* s, const Eigen::Isometry3d& p,
                                OctreeVoxelRenderMode octree_voxel_rendering, OctreeVoxelColorMode octree_color_mode,
                                const rviz::Color& color, float alpha)
 {
-  rviz::Shape* ogre_shape = NULL;
+  rviz::Shape* ogre_shape = nullptr;
   Eigen::Vector3d translation = p.translation();
   Ogre::Vector3 position(translation.x(), translation.y(), translation.z());
-  Eigen::Quaterniond q(p.rotation());
+  ASSERT_ISOMETRY(p)  // unsanitized input, could contain a non-isometry
+  Eigen::Quaterniond q(p.linear());
   Ogre::Quaternion orientation(q.w(), q.x(), q.y(), q.z());
-
-  // we don't know how to render cones directly, but we can convert them to a mesh
-  if (s->type == shapes::CONE)
-  {
-    std::unique_ptr<shapes::Mesh> m(shapes::createMeshFromShape(static_cast<const shapes::Cone&>(*s)));
-    if (m)
-      renderShape(node, m.get(), p, octree_voxel_rendering, octree_color_mode, color, alpha);
-    return;
-  }
 
   switch (s->type)
   {
@@ -113,6 +106,29 @@ void RenderShapes::renderShape(Ogre::SceneNode* node, const shapes::Shape* s, co
       double z = static_cast<const shapes::Cylinder*>(s)->length;
       ogre_shape->setScale(Ogre::Vector3(d, z, d));  // the shape has z as major axis, but the rendered cylinder has y
                                                      // as major axis (assuming z is upright);
+    }
+    break;
+    case shapes::CONE:
+    {
+      ogre_shape = new rviz::Shape(rviz::Shape::Cone, context_->getSceneManager(), node);
+      double d = 2.0 * static_cast<const shapes::Cone*>(s)->radius;
+      double z = static_cast<const shapes::Cone*>(s)->length;
+      ogre_shape->setScale(Ogre::Vector3(d, z, d));
+    }
+    break;
+    case shapes::PLANE:
+    {
+      ogre_shape = new rviz::Shape(rviz::Shape::Cube, context_->getSceneManager(), node);
+      ogre_shape->setScale(Ogre::Vector3(10, 10, 0.001));  // model plane by thin box
+      alpha *= 0.5;                                        // and make it transparent
+      const auto* plane = static_cast<const shapes::Plane*>(s);
+      Eigen::Vector3d normal(plane->a, plane->b, plane->c);
+      double norm = normal.norm();
+      normal /= norm;
+      // adapt pose to match desired normal direction and position
+      Eigen::Quaterniond offset = Eigen::Quaterniond::FromTwoVectors(Eigen::Vector3d::UnitZ(), normal);
+      orientation = orientation * Ogre::Quaternion(offset.w(), offset.x(), offset.y(), offset.z());
+      position += plane->d / norm * Ogre::Vector3(normal.x(), normal.y(), normal.z());
     }
     break;
     case shapes::MESH:
@@ -157,7 +173,7 @@ void RenderShapes::renderShape(Ogre::SceneNode* node, const shapes::Shape* s, co
     case shapes::OCTREE:
     {
       OcTreeRenderPtr octree(new OcTreeRender(static_cast<const shapes::OcTree*>(s)->octree, octree_voxel_rendering,
-                                              octree_color_mode, 0u, context_->getSceneManager(), node));
+                                              octree_color_mode, 0u, node));
       octree->setPosition(position);
       octree->setOrientation(orientation);
       octree_voxel_grids_.push_back(octree);
@@ -172,7 +188,7 @@ void RenderShapes::renderShape(Ogre::SceneNode* node, const shapes::Shape* s, co
   {
     ogre_shape->setColor(color.r_, color.g_, color.b_, alpha);
 
-    if (s->type == shapes::CYLINDER)
+    if (s->type == shapes::CYLINDER || s->type == shapes::CONE)
     {
       // in geometric shapes, the z axis of the cylinder is its height;
       // for the rviz shape, the y axis is the height; we add a transform to fix this
@@ -186,4 +202,11 @@ void RenderShapes::renderShape(Ogre::SceneNode* node, const shapes::Shape* s, co
     scene_shapes_.emplace_back(ogre_shape);
   }
 }
+
+void RenderShapes::updateShapeColors(float r, float g, float b, float a)
+{
+  for (const std::unique_ptr<rviz::Shape>& shape : scene_shapes_)
+    shape->setColor(r, g, b, a);
 }
+
+}  // namespace moveit_rviz_plugin

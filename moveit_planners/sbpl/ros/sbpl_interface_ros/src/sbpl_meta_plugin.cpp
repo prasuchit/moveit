@@ -51,7 +51,7 @@ public:
   {
     ros::NodeHandle nh;
     // display_bfs_publisher_ = nh.advertise<visualization_msgs::Marker>("planning_components_visualization", 10, true);
-    sbpl_meta_interface_.reset(new sbpl_interface::SBPLMetaInterface(model));
+    sbpl_meta_interface_ = std::make_shared<sbpl_interface::SBPLMetaInterface>(model);
   }
 
   bool canServiceRequest(const moveit_msgs::GetMotionPlan::Request& req,
@@ -106,6 +106,6 @@ private:
   boost::shared_ptr<sbpl_interface::SBPLMetaInterface> sbpl_meta_interface_;
 };
 
-}  // ompl_interface_ros
+}  // namespace sbpl_interface_ros
 
 PLUGINLIB_EXPORT_CLASS(sbpl_interface_ros::SBPLMetaPlanner, planning_interface::Planner);

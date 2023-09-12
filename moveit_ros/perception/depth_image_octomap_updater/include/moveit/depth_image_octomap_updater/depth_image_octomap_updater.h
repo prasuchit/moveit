@@ -34,11 +34,10 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_OCCUPANCY_MAP_DEPTH_IMAGE_OCCUPANCY_MAP_UPDATER_
-#define MOVEIT_OCCUPANCY_MAP_DEPTH_IMAGE_OCCUPANCY_MAP_UPDATER_
+#pragma once
 
 #include <ros/ros.h>
-#include <tf/tf.h>
+#include <tf2_ros/buffer.h>
 #include <moveit/occupancy_map_monitor/occupancy_map_updater.h>
 #include <moveit/mesh_filter/mesh_filter.h>
 #include <moveit/mesh_filter/stereo_camera_model.h>
@@ -52,22 +51,22 @@ class DepthImageOctomapUpdater : public OccupancyMapUpdater
 {
 public:
   DepthImageOctomapUpdater();
-  virtual ~DepthImageOctomapUpdater();
+  ~DepthImageOctomapUpdater() override;
 
-  virtual bool setParams(XmlRpc::XmlRpcValue& params);
-  virtual bool initialize();
-  virtual void start();
-  virtual void stop();
-  virtual ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape);
-  virtual void forgetShape(ShapeHandle handle);
+  bool setParams(XmlRpc::XmlRpcValue& params) override;
+  bool initialize() override;
+  void start() override;
+  void stop() override;
+  ShapeHandle excludeShape(const shapes::ShapeConstPtr& shape) override;
+  void forgetShape(ShapeHandle handle) override;
 
 private:
   void depthImageCallback(const sensor_msgs::ImageConstPtr& depth_msg, const sensor_msgs::CameraInfoConstPtr& info_msg);
-  bool getShapeTransform(mesh_filter::MeshHandle h, Eigen::Affine3d& transform) const;
+  bool getShapeTransform(mesh_filter::MeshHandle h, Eigen::Isometry3d& transform) const;
   void stopHelper();
 
   ros::NodeHandle nh_;
-  boost::shared_ptr<tf::Transformer> tf_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   image_transport::ImageTransport input_depth_transport_;
   image_transport::ImageTransport model_depth_transport_;
   image_transport::ImageTransport filtered_depth_transport_;
@@ -81,6 +80,7 @@ private:
   ros::Time last_update_time_;
 
   std::string filtered_cloud_topic_;
+  std::string ns_;
   std::string sensor_type_;
   std::string image_topic_;
   std::size_t queue_size_;
@@ -106,6 +106,4 @@ private:
   std::vector<unsigned int> filtered_labels_;
   ros::WallTime last_depth_callback_start_;
 };
-}
-
-#endif
+}  // namespace occupancy_map_monitor

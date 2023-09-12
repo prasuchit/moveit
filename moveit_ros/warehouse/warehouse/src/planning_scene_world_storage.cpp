@@ -36,6 +36,8 @@
 
 #include <moveit/warehouse/planning_scene_world_storage.h>
 
+#include <utility>
+
 const std::string moveit_warehouse::PlanningSceneWorldStorage::DATABASE_NAME = "moveit_planning_scene_worlds";
 const std::string moveit_warehouse::PlanningSceneWorldStorage::PLANNING_SCENE_WORLD_ID_NAME = "world_id";
 
@@ -43,7 +45,7 @@ using warehouse_ros::Metadata;
 using warehouse_ros::Query;
 
 moveit_warehouse::PlanningSceneWorldStorage::PlanningSceneWorldStorage(warehouse_ros::DatabaseConnection::Ptr conn)
-  : MoveItMessageStorage(conn)
+  : MoveItMessageStorage(std::move(conn))
 {
   createCollections();
 }
@@ -95,11 +97,11 @@ void moveit_warehouse::PlanningSceneWorldStorage::getKnownPlanningSceneWorlds(st
 {
   names.clear();
   Query::Ptr q = planning_scene_world_collection_->createQuery();
-  std::vector<PlanningSceneWorldWithMetadata> constr =
+  std::vector<PlanningSceneWorldWithMetadata> planning_scene_worlds =
       planning_scene_world_collection_->queryList(q, true, PLANNING_SCENE_WORLD_ID_NAME, true);
-  for (std::size_t i = 0; i < constr.size(); ++i)
-    if (constr[i]->lookupField(PLANNING_SCENE_WORLD_ID_NAME))
-      names.push_back(constr[i]->lookupString(PLANNING_SCENE_WORLD_ID_NAME));
+  for (PlanningSceneWorldWithMetadata& planning_scene_world : planning_scene_worlds)
+    if (planning_scene_world->lookupField(PLANNING_SCENE_WORLD_ID_NAME))
+      names.push_back(planning_scene_world->lookupString(PLANNING_SCENE_WORLD_ID_NAME));
 }
 
 bool moveit_warehouse::PlanningSceneWorldStorage::getPlanningSceneWorld(PlanningSceneWorldWithMetadata& msg_m,

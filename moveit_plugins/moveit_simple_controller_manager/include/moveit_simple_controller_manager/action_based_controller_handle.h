@@ -35,8 +35,7 @@
 
 /* Author: Michael Ferguson, Ioan Sucan, E. Gil Jones */
 
-#ifndef MOVEIT_PLUGINS_ACTION_BASED_CONTROLLER_HANDLE
-#define MOVEIT_PLUGINS_ACTION_BASED_CONTROLLER_HANDLE
+#pragma once
 
 #include <actionlib/client/simple_action_client.h>
 #include <moveit/controller_manager/controller_manager.h>
@@ -57,9 +56,13 @@ public:
 
   virtual void addJoint(const std::string& name) = 0;
   virtual void getJoints(std::vector<std::string>& joints) = 0;
+  virtual void configure(XmlRpc::XmlRpcValue& /* config */)
+  {
+  }
 };
 
-MOVEIT_CLASS_FORWARD(ActionBasedControllerHandleBase);
+MOVEIT_CLASS_FORWARD(
+    ActionBasedControllerHandleBase);  // Defines ActionBasedControllerHandleBasePtr, ConstPtr, WeakPtr... etc
 
 /*
  * This is a simple base class, which handles all of the action creation/etc
@@ -71,7 +74,7 @@ public:
   ActionBasedControllerHandle(const std::string& name, const std::string& ns)
     : ActionBasedControllerHandleBase(name), nh_("~"), done_(true), namespace_(ns)
   {
-    controller_action_client_.reset(new actionlib::SimpleActionClient<T>(getActionName(), true));
+    controller_action_client_ = std::make_shared<actionlib::SimpleActionClient<T>>(getActionName(), true);
     unsigned int attempts = 0;
     double timeout;
     nh_.param("trajectory_execution/controller_connection_timeout", timeout, 15.0);
@@ -106,7 +109,7 @@ public:
     return static_cast<bool>(controller_action_client_);
   }
 
-  virtual bool cancelExecution()
+  bool cancelExecution() override
   {
     if (!controller_action_client_)
       return false;
@@ -120,31 +123,37 @@ public:
     return true;
   }
 
-  virtual bool waitForExecution(const ros::Duration& timeout = ros::Duration(0))
+  bool waitForExecution(const ros::Duration& timeout = ros::Duration(0)) override
   {
     if (controller_action_client_ && !done_)
       return controller_action_client_->waitForResult(timeout);
+#if 1  // TODO: remove when https://github.com/ros/actionlib/issues/155 is fixed
+    // workaround for actionlib issue: waitForResult() might return before our doneCB finished
+    ros::Time deadline = ros::Time::now() + ros::Duration(0.1);  // limit waiting to 0.1s
+    while (!done_ && ros::ok() && ros::Time::now() < deadline)   // Check the done_ flag explicitly,
+      ros::Duration(0.0001).sleep();                             // which is eventually set in finishControllerExecution
+#endif
     return true;
   }
 
-  virtual moveit_controller_manager::ExecutionStatus getLastExecutionStatus()
+  moveit_controller_manager::ExecutionStatus getLastExecutionStatus() override
   {
     return last_exec_;
   }
 
-  virtual void addJoint(const std::string& name)
+  void addJoint(const std::string& name) override
   {
     joints_.push_back(name);
   }
 
-  virtual void getJoints(std::vector<std::string>& joints)
+  void getJoints(std::vector<std::string>& joints) override
   {
     joints = joints_;
   }
 
 protected:
   ros::NodeHandle nh_;
-  std::string getActionName(void) const
+  std::string getActionName() const
   {
     if (namespace_.empty())
       return name_;
@@ -179,9 +188,7 @@ protected:
   std::vector<std::string> joints_;
 
   /* action client */
-  std::shared_ptr<actionlib::SimpleActionClient<T> > controller_action_client_;
+  std::shared_ptr<actionlib::SimpleActionClient<T>> controller_action_client_;
 };
 
 }  // end namespace moveit_simple_controller_manager
-
-#endif  // MOVEIT_PLUGINS_ACTION_BASED_CONTROLLER_HANDLE

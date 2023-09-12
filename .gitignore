@@ -51,10 +51,13 @@ qtcreator-*
 # Vim
 *.swp
 
-# Catkin custom files
-CATKIN_IGNORE
-
 # Continous Integration
 .moveit_ci
 
 *.pyc
+
+#gdb
+*.gdb
+
+_build
+_autosummary

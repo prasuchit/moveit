@@ -51,7 +51,7 @@ public:
   {
     ros::NodeHandle nh;
     display_bfs_publisher_ = nh.advertise<visualization_msgs::Marker>("planning_components_visualization", 10, true);
-    sbpl_interface_.reset(new sbpl_interface::SBPLInterface(model));
+    sbpl_interface_ = std::make_shared<sbpl_interface::SBPLInterface>(model);
   }
 
   bool canServiceRequest(const moveit_msgs::GetMotionPlan::Request& req,
@@ -111,6 +111,6 @@ private:
   boost::shared_ptr<sbpl_interface::SBPLInterface> sbpl_interface_;
 };
 
-}  // ompl_interface_ros
+}  // namespace sbpl_interface_ros
 
 PLUGINLIB_EXPORT_CLASS(sbpl_interface_ros::SBPLPlanner, planning_interface::Planner);

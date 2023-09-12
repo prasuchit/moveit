@@ -52,25 +52,24 @@ typedef std::map<std::string, LinkConstraintPair> LinkConstraintMap;
 
 void collectLinkConstraints(const moveit_msgs::Constraints& constraints, LinkConstraintMap& lcmap)
 {
-  for (std::size_t i = 0; i < constraints.position_constraints.size(); ++i)
+  for (const moveit_msgs::PositionConstraint& position_constraint : constraints.position_constraints)
   {
     LinkConstraintPair lcp;
-    const moveit_msgs::PositionConstraint& pc = constraints.position_constraints[i];
+    const moveit_msgs::PositionConstraint& pc = position_constraint;
     lcp.first = pc.constraint_region.primitive_poses[0].position;
-    lcmap[constraints.position_constraints[i].link_name] = lcp;
+    lcmap[position_constraint.link_name] = lcp;
   }
 
-  for (std::size_t i = 0; i < constraints.orientation_constraints.size(); ++i)
+  for (const moveit_msgs::OrientationConstraint& orientation_constraint : constraints.orientation_constraints)
   {
-    if (lcmap.count(constraints.orientation_constraints[i].link_name))
+    if (lcmap.count(orientation_constraint.link_name))
     {
-      lcmap[constraints.orientation_constraints[i].link_name].second =
-          constraints.orientation_constraints[i].orientation;
+      lcmap[orientation_constraint.link_name].second = orientation_constraint.orientation;
     }
     else
     {
       ROS_WARN("Orientation constraint for %s has no matching position constraint",
-               constraints.orientation_constraints[i].link_name.c_str());
+               orientation_constraint.link_name.c_str());
     }
   }
 }
@@ -80,9 +79,10 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "save_warehouse_as_text", ros::init_options::AnonymousName);
 
   boost::program_options::options_description desc;
-  desc.add_options()("help", "Show help message")("host", boost::program_options::value<std::string>(), "Host for the "
-                                                                                                        "DB.")(
-      "port", boost::program_options::value<std::size_t>(), "Port for the DB.");
+  desc.add_options()("help", "Show help message")("host", boost::program_options::value<std::string>(),
+                                                  "Host for the "
+                                                  "DB.")("port", boost::program_options::value<std::size_t>(),
+                                                         "Port for the DB.");
 
   boost::program_options::variables_map vm;
   boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
@@ -112,70 +112,70 @@ int main(int argc, char** argv)
   std::vector<std::string> scene_names;
   pss.getPlanningSceneNames(scene_names);
 
-  for (std::size_t i = 0; i < scene_names.size(); ++i)
+  for (const std::string& scene_name : scene_names)
   {
     moveit_warehouse::PlanningSceneWithMetadata pswm;
-    if (pss.getPlanningScene(pswm, scene_names[i]))
+    if (pss.getPlanningScene(pswm, scene_name))
     {
-      ROS_INFO("Saving scene '%s'", scene_names[i].c_str());
+      ROS_INFO("Saving scene '%s'", scene_name.c_str());
       psm.getPlanningScene()->setPlanningSceneMsg(static_cast<const moveit_msgs::PlanningScene&>(*pswm));
-      std::ofstream fout((scene_names[i] + ".scene").c_str());
+      std::ofstream fout((scene_name + ".scene").c_str());
       psm.getPlanningScene()->saveGeometryToStream(fout);
       fout.close();
 
-      std::vector<std::string> robotStateNames;
-      robot_model::RobotModelConstPtr km = psm.getRobotModel();
+      std::vector<std::string> robot_state_names;
+      moveit::core::RobotModelConstPtr km = psm.getRobotModel();
       // Get start states for scene
       std::stringstream rsregex;
-      rsregex << ".*" << scene_names[i] << ".*";
-      rss.getKnownRobotStates(rsregex.str(), robotStateNames);
+      rsregex << ".*" << scene_name << ".*";
+      rss.getKnownRobotStates(rsregex.str(), robot_state_names);
 
       // Get goal constraints for scene
-      std::vector<std::string> constraintNames;
+      std::vector<std::string> constraint_names;
 
       std::stringstream csregex;
-      csregex << ".*" << scene_names[i] << ".*";
-      cs.getKnownConstraints(csregex.str(), constraintNames);
+      csregex << ".*" << scene_name << ".*";
+      cs.getKnownConstraints(csregex.str(), constraint_names);
 
-      if (!(robotStateNames.empty() && constraintNames.empty()))
+      if (!(robot_state_names.empty() && constraint_names.empty()))
       {
-        std::ofstream qfout((scene_names[i] + ".queries").c_str());
-        qfout << scene_names[i] << std::endl;
-        if (robotStateNames.size())
+        std::ofstream qfout((scene_name + ".queries").c_str());
+        qfout << scene_name << std::endl;
+        if (!robot_state_names.empty())
         {
           qfout << "start" << std::endl;
-          qfout << robotStateNames.size() << std::endl;
-          for (std::size_t k = 0; k < robotStateNames.size(); ++k)
+          qfout << robot_state_names.size() << std::endl;
+          for (const std::string& robot_state_name : robot_state_names)
           {
-            ROS_INFO("Saving start state %s for scene %s", robotStateNames[k].c_str(), scene_names[i].c_str());
-            qfout << robotStateNames[k] << std::endl;
-            moveit_warehouse::RobotStateWithMetadata robotState;
-            rss.getRobotState(robotState, robotStateNames[k]);
-            robot_state::RobotState ks(km);
-            robot_state::robotStateMsgToRobotState(*robotState, ks, false);
+            ROS_INFO("Saving start state %s for scene %s", robot_state_name.c_str(), scene_name.c_str());
+            qfout << robot_state_name << std::endl;
+            moveit_warehouse::RobotStateWithMetadata robot_state;
+            rss.getRobotState(robot_state, robot_state_name);
+            moveit::core::RobotState ks(km);
+            moveit::core::robotStateMsgToRobotState(*robot_state, ks, false);
             ks.printStateInfo(qfout);
             qfout << "." << std::endl;
           }
         }
 
-        if (constraintNames.size())
+        if (!constraint_names.empty())
         {
           qfout << "goal" << std::endl;
-          qfout << constraintNames.size() << std::endl;
-          for (std::size_t k = 0; k < constraintNames.size(); ++k)
+          qfout << constraint_names.size() << std::endl;
+          for (const std::string& constraint_name : constraint_names)
           {
-            ROS_INFO("Saving goal %s for scene %s", constraintNames[k].c_str(), scene_names[i].c_str());
+            ROS_INFO("Saving goal %s for scene %s", constraint_name.c_str(), scene_name.c_str());
             qfout << "link_constraint" << std::endl;
-            qfout << constraintNames[k] << std::endl;
+            qfout << constraint_name << std::endl;
             moveit_warehouse::ConstraintsWithMetadata constraints;
-            cs.getConstraints(constraints, constraintNames[k]);
+            cs.getConstraints(constraints, constraint_name);
 
             LinkConstraintMap lcmap;
             collectLinkConstraints(*constraints, lcmap);
-            for (LinkConstraintMap::iterator iter = lcmap.begin(); iter != lcmap.end(); iter++)
+            for (std::pair<const std::string, LinkConstraintPair>& iter : lcmap)
             {
-              std::string link_name = iter->first;
-              LinkConstraintPair lcp = iter->second;
+              std::string link_name = iter.first;
+              LinkConstraintPair lcp = iter.second;
               qfout << link_name << std::endl;
               qfout << "xyz " << lcp.first.x << " " << lcp.first.y << " " << lcp.first.z << std::endl;
               Eigen::Quaterniond orientation(lcp.second.w, lcp.second.x, lcp.second.y, lcp.second.z);

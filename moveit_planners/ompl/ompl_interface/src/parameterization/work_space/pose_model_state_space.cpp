@@ -1,42 +1,49 @@
 /*********************************************************************
-* Software License Agreement (BSD License)
-*
-*  Copyright (c) 2012, Willow Garage, Inc.
-*  All rights reserved.
-*
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
-*
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of Willow Garage nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
-*
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
-*********************************************************************/
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2012, Willow Garage, Inc.
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of Willow Garage nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *********************************************************************/
 
 /* Author: Ioan Sucan */
 
 #include <moveit/ompl_interface/parameterization/work_space/pose_model_state_space.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <moveit/profiler/profiler.h>
+
+#include <utility>
+
+namespace ompl_interface
+{
+constexpr char LOGNAME[] = "pose_model_state_space";
+}  // namespace ompl_interface
 
 const std::string ompl_interface::PoseModelStateSpace::PARAMETERIZATION_TYPE = "PoseModel";
 
@@ -46,24 +53,22 @@ ompl_interface::PoseModelStateSpace::PoseModelStateSpace(const ModelBasedStateSp
   jump_factor_ = 3;  // \todo make this a param
 
   if (spec.joint_model_group_->getGroupKinematics().first)
-    poses_.push_back(PoseComponent(spec.joint_model_group_, spec.joint_model_group_->getGroupKinematics().first));
+    poses_.emplace_back(spec.joint_model_group_, spec.joint_model_group_->getGroupKinematics().first);
   else if (!spec.joint_model_group_->getGroupKinematics().second.empty())
   {
-    const robot_model::JointModelGroup::KinematicsSolverMap& m = spec.joint_model_group_->getGroupKinematics().second;
-    for (robot_model::JointModelGroup::KinematicsSolverMap::const_iterator it = m.begin(); it != m.end(); ++it)
-      poses_.push_back(PoseComponent(it->first, it->second));
+    const moveit::core::JointModelGroup::KinematicsSolverMap& m = spec.joint_model_group_->getGroupKinematics().second;
+    for (const auto& it : m)
+      poses_.emplace_back(it.first, it.second);
   }
   if (poses_.empty())
-    ROS_ERROR_NAMED("pose_model_state_space", "No kinematics solvers specified. Unable to construct a "
-                                              "PoseModelStateSpace");
+    ROS_ERROR_NAMED(LOGNAME, "No kinematics solvers specified. Unable to construct a "
+                             "PoseModelStateSpace");
   else
     std::sort(poses_.begin(), poses_.end());
   setName(getName() + "_" + PARAMETERIZATION_TYPE);
 }
 
-ompl_interface::PoseModelStateSpace::~PoseModelStateSpace()
-{
-}
+ompl_interface::PoseModelStateSpace::~PoseModelStateSpace() = default;
 
 double ompl_interface::PoseModelStateSpace::distance(const ompl::base::State* state1,
                                                      const ompl::base::State* state2) const
@@ -77,14 +82,14 @@ double ompl_interface::PoseModelStateSpace::distance(const ompl::base::State* st
 double ompl_interface::PoseModelStateSpace::getMaximumExtent() const
 {
   double total = 0.0;
-  for (std::size_t i = 0; i < poses_.size(); ++i)
-    total += poses_[i].state_space_->getMaximumExtent();
+  for (const auto& pose : poses_)
+    total += pose.state_space_->getMaximumExtent();
   return total;
 }
 
 ompl::base::State* ompl_interface::PoseModelStateSpace::allocState() const
 {
-  StateType* state = new StateType();
+  auto* state = new StateType();
   state->values =
       new double[variable_count_];  // need to allocate this here since ModelBasedStateSpace::allocState() is not called
   state->poses = new ompl::base::SE3StateSpace::StateType*[poses_.size()];
@@ -172,15 +177,15 @@ void ompl_interface::PoseModelStateSpace::setPlanningVolume(double minX, double 
   b.high[0] = maxX;
   b.high[1] = maxY;
   b.high[2] = maxZ;
-  for (std::size_t i = 0; i < poses_.size(); ++i)
-    poses_[i].state_space_->as<ompl::base::SE3StateSpace>()->setBounds(b);
+  for (auto& pose : poses_)
+    pose.state_space_->as<ompl::base::SE3StateSpace>()->setBounds(b);
 }
 
 ompl_interface::PoseModelStateSpace::PoseComponent::PoseComponent(
-    const robot_model::JointModelGroup* subgroup, const robot_model::JointModelGroup::KinematicsSolver& k)
+    const moveit::core::JointModelGroup* subgroup, const moveit::core::JointModelGroup::KinematicsSolver& k)
   : subgroup_(subgroup), kinematics_solver_(k.allocator_(subgroup)), bijection_(k.bijection_)
 {
-  state_space_.reset(new ompl::base::SE3StateSpace());
+  state_space_ = std::make_shared<ompl::base::SE3StateSpace>();
   state_space_->setName(subgroup_->getName() + "_Workspace");
   fk_link_.resize(1, kinematics_solver_->getTipFrame());
   if (!fk_link_[0].empty() && fk_link_[0][0] == '/')
@@ -299,24 +304,24 @@ ompl::base::StateSamplerPtr ompl_interface::PoseModelStateSpace::allocDefaultSta
   class PoseModelStateSampler : public ompl::base::StateSampler
   {
   public:
-    PoseModelStateSampler(const ompl::base::StateSpace* space, const ompl::base::StateSamplerPtr& sampler)
-      : ompl::base::StateSampler(space), sampler_(sampler)
+    PoseModelStateSampler(const ompl::base::StateSpace* space, ompl::base::StateSamplerPtr sampler)
+      : ompl::base::StateSampler(space), sampler_(std::move(sampler))
     {
     }
 
-    virtual void sampleUniform(ompl::base::State* state)
+    void sampleUniform(ompl::base::State* state) override
     {
       sampler_->sampleUniform(state);
       afterStateSample(state);
     }
 
-    virtual void sampleUniformNear(ompl::base::State* state, const ompl::base::State* near, const double distance)
+    void sampleUniformNear(ompl::base::State* state, const ompl::base::State* near, const double distance) override
     {
       sampler_->sampleUniformNear(state, near, distance);
       afterStateSample(state);
     }
 
-    virtual void sampleGaussian(ompl::base::State* state, const ompl::base::State* mean, const double stdDev)
+    void sampleGaussian(ompl::base::State* state, const ompl::base::State* mean, const double stdDev) override
     {
       sampler_->sampleGaussian(state, mean, stdDev);
       afterStateSample(state);
@@ -338,7 +343,7 @@ ompl::base::StateSamplerPtr ompl_interface::PoseModelStateSpace::allocDefaultSta
 }
 
 void ompl_interface::PoseModelStateSpace::copyToOMPLState(ompl::base::State* state,
-                                                          const robot_state::RobotState& rstate) const
+                                                          const moveit::core::RobotState& rstate) const
 {
   ModelBasedStateSpace::copyToOMPLState(state, rstate);
   state->as<StateType>()->setJointsComputed(true);

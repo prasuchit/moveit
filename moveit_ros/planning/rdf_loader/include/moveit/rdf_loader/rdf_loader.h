@@ -34,22 +34,17 @@
 
 /* Author: Ioan Sucan, Mathias Lüdtke, Dave Coleman */
 
-#ifndef MOVEIT_PLANNING_RDF_LOADER_
-#define MOVEIT_PLANNING_RDF_LOADER_
+#pragma once
 
 #include <moveit/macros/class_forward.h>
 #include <urdf/model.h>
 #include <srdfdom/model.h>
 
-class TiXmlDocument;
-
 namespace rdf_loader
 {
-MOVEIT_CLASS_FORWARD(RDFLoader);
+MOVEIT_CLASS_FORWARD(RDFLoader);  // Defines RDFLoaderPtr, ConstPtr, WeakPtr... etc
 
-/** @class RDFLoader
- *  @brief Default constructor
- *  @param robot_description The string name corresponding to the ROS param where the URDF is loaded*/
+/** Loader for .urdf and .srdf descriptions */
 class RDFLoader
 {
 public:
@@ -60,9 +55,6 @@ public:
 
   /** \brief Initialize the robot model from a string representation of the URDF and SRDF documents */
   RDFLoader(const std::string& urdf_string, const std::string& srdf_string);
-
-  /** \brief Initialize the robot model from a parsed XML representation of the URDF and SRDF */
-  RDFLoader(TiXmlDocument* urdf_doc, TiXmlDocument* srdf_doc);
 
   /** @brief Get the resolved parameter name for the robot description */
   const std::string& getRobotDescription() const
@@ -106,5 +98,4 @@ private:
   srdf::ModelSharedPtr srdf_;
   urdf::ModelInterfaceSharedPtr urdf_;
 };
-}
-#endif
+}  // namespace rdf_loader

@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan, Sachin Chitta */
 
-#ifndef MOVEIT_PICK_PLACE_APPROACH_AND_TRANSLATE_STAGE_
-#define MOVEIT_PICK_PLACE_APPROACH_AND_TRANSLATE_STAGE_
+#pragma once
 
 #include <moveit/pick_place/manipulation_stage.h>
 #include <moveit/planning_pipeline/planning_pipeline.h>
@@ -49,7 +48,7 @@ public:
   ApproachAndTranslateStage(const planning_scene::PlanningSceneConstPtr& scene,
                             const collision_detection::AllowedCollisionMatrixConstPtr& collision_matrix);
 
-  virtual bool evaluate(const ManipulationPlanPtr& plan) const;
+  bool evaluate(const ManipulationPlanPtr& plan) const override;
 
 private:
   planning_scene::PlanningSceneConstPtr planning_scene_;
@@ -61,6 +60,4 @@ private:
   double max_step_;
   double jump_factor_;
 };
-}
-
-#endif
+}  // namespace pick_place

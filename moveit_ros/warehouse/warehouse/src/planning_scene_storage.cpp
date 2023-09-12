@@ -36,6 +36,7 @@
 
 #include <moveit/warehouse/planning_scene_storage.h>
 #include <boost/regex.hpp>
+#include <utility>
 
 const std::string moveit_warehouse::PlanningSceneStorage::DATABASE_NAME = "moveit_planning_scenes";
 
@@ -46,7 +47,7 @@ using warehouse_ros::Metadata;
 using warehouse_ros::Query;
 
 moveit_warehouse::PlanningSceneStorage::PlanningSceneStorage(warehouse_ros::DatabaseConnection::Ptr conn)
-  : MoveItMessageStorage(conn)
+  : MoveItMessageStorage(std::move(conn))
 {
   createCollections();
 }
@@ -91,8 +92,9 @@ bool moveit_warehouse::PlanningSceneStorage::hasPlanningScene(const std::string&
   return !planning_scenes.empty();
 }
 
-std::string moveit_warehouse::PlanningSceneStorage::getMotionPlanRequestName(
-    const moveit_msgs::MotionPlanRequest& planning_query, const std::string& scene_name) const
+std::string
+moveit_warehouse::PlanningSceneStorage::getMotionPlanRequestName(const moveit_msgs::MotionPlanRequest& planning_query,
+                                                                 const std::string& scene_name) const
 {
   // get all existing motion planning requests for this planning scene
   Query::Ptr q = motion_plan_request_collection_->createQuery();
@@ -110,19 +112,19 @@ std::string moveit_warehouse::PlanningSceneStorage::getMotionPlanRequestName(
   ros::serialization::serialize(stream_arg, planning_query);
   const void* data_arg = buffer_arg.get();
 
-  for (std::size_t i = 0; i < existing_requests.size(); ++i)
+  for (MotionPlanRequestWithMetadata& existing_request : existing_requests)
   {
-    const size_t serial_size = ros::serialization::serializationLength(
-        static_cast<const moveit_msgs::MotionPlanRequest&>(*existing_requests[i]));
+    const size_t serial_size =
+        ros::serialization::serializationLength(static_cast<const moveit_msgs::MotionPlanRequest&>(*existing_request));
     if (serial_size != serial_size_arg)
       continue;
     boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
     ros::serialization::OStream stream(buffer.get(), serial_size);
-    ros::serialization::serialize(stream, static_cast<const moveit_msgs::MotionPlanRequest&>(*existing_requests[i]));
+    ros::serialization::serialize(stream, static_cast<const moveit_msgs::MotionPlanRequest&>(*existing_request));
     const void* data = buffer.get();
     if (memcmp(data_arg, data, serial_size) == 0)
       // we found the same message twice
-      return existing_requests[i]->lookupString(MOTION_PLAN_REQUEST_ID_NAME);
+      return existing_request->lookupString(MOTION_PLAN_REQUEST_ID_NAME);
   }
   return "";
 }
@@ -137,7 +139,7 @@ void moveit_warehouse::PlanningSceneStorage::addPlanningQuery(const moveit_msgs:
   if (!query_name.empty() && id.empty())
     removePlanningQuery(scene_name, query_name);
 
-  if (id != query_name || id == "")
+  if (id != query_name || id.empty())
     addNewPlanningRequest(planning_query, scene_name, query_name);
 }
 
@@ -151,8 +153,8 @@ std::string moveit_warehouse::PlanningSceneStorage::addNewPlanningRequest(
     Query::Ptr q = motion_plan_request_collection_->createQuery();
     q->append(PLANNING_SCENE_ID_NAME, scene_name);
     std::vector<MotionPlanRequestWithMetadata> existing_requests = motion_plan_request_collection_->queryList(q, true);
-    for (std::size_t i = 0; i < existing_requests.size(); ++i)
-      used.insert(existing_requests[i]->lookupString(MOTION_PLAN_REQUEST_ID_NAME));
+    for (MotionPlanRequestWithMetadata& existing_request : existing_requests)
+      used.insert(existing_request->lookupString(MOTION_PLAN_REQUEST_ID_NAME));
     std::size_t index = existing_requests.size();
     do
     {
@@ -187,9 +189,9 @@ void moveit_warehouse::PlanningSceneStorage::getPlanningSceneNames(std::vector<s
   Query::Ptr q = planning_scene_collection_->createQuery();
   std::vector<PlanningSceneWithMetadata> planning_scenes =
       planning_scene_collection_->queryList(q, true, PLANNING_SCENE_ID_NAME, true);
-  for (std::size_t i = 0; i < planning_scenes.size(); ++i)
-    if (planning_scenes[i]->lookupField(PLANNING_SCENE_ID_NAME))
-      names.push_back(planning_scenes[i]->lookupString(PLANNING_SCENE_ID_NAME));
+  for (PlanningSceneWithMetadata& planning_scene : planning_scenes)
+    if (planning_scene->lookupField(PLANNING_SCENE_ID_NAME))
+      names.push_back(planning_scene->lookupString(PLANNING_SCENE_ID_NAME));
 }
 
 void moveit_warehouse::PlanningSceneStorage::getPlanningSceneNames(const std::string& regex,
@@ -265,9 +267,9 @@ void moveit_warehouse::PlanningSceneStorage::getPlanningQueriesNames(std::vector
   q->append(PLANNING_SCENE_ID_NAME, scene_name);
   std::vector<MotionPlanRequestWithMetadata> planning_queries = motion_plan_request_collection_->queryList(q, true);
   query_names.clear();
-  for (std::size_t i = 0; i < planning_queries.size(); ++i)
-    if (planning_queries[i]->lookupField(MOTION_PLAN_REQUEST_ID_NAME))
-      query_names.push_back(planning_queries[i]->lookupString(MOTION_PLAN_REQUEST_ID_NAME));
+  for (MotionPlanRequestWithMetadata& planning_query : planning_queries)
+    if (planning_query->lookupField(MOTION_PLAN_REQUEST_ID_NAME))
+      query_names.push_back(planning_query->lookupString(MOTION_PLAN_REQUEST_ID_NAME));
 }
 
 void moveit_warehouse::PlanningSceneStorage::getPlanningQueriesNames(const std::string& regex,
@@ -280,12 +282,12 @@ void moveit_warehouse::PlanningSceneStorage::getPlanningQueriesNames(const std::
   {
     std::vector<std::string> fnames;
     boost::regex r(regex);
-    for (std::size_t i = 0; i < query_names.size(); ++i)
+    for (const std::string& query_name : query_names)
     {
       boost::cmatch match;
-      if (boost::regex_match(query_names[i].c_str(), match, r))
+      if (boost::regex_match(query_name.c_str(), match, r))
       {
-        fnames.push_back(query_names[i]);
+        fnames.push_back(query_name);
       }
     }
     query_names.swap(fnames);

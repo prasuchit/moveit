@@ -42,7 +42,6 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <ros/console.h>
 #include <map>
-#include <iterator>
 
 namespace moveit_fake_controller_manager
 {
@@ -68,7 +67,9 @@ public:
       return;
     }
 
-    pub_ = node_handle_.advertise<sensor_msgs::JointState>("fake_controller_joint_states", 100, false);
+    /* by setting latch to true we preserve the initial joint state while other nodes launch */
+    bool latch = true;
+    pub_ = node_handle_.advertise<sensor_msgs::JointState>("fake_controller_joint_states", 100, latch);
 
     /* publish initial pose */
     XmlRpc::XmlRpcValue initial;
@@ -80,7 +81,7 @@ public:
     }
 
     /* actually create each controller */
-    for (int i = 0; i < controller_list.size(); ++i)
+    for (int i = 0; i < controller_list.size(); ++i)  // NOLINT(modernize-loop-convert)
     {
       if (!controller_list[i].hasMember("name") || !controller_list[i].hasMember("joints"))
       {
@@ -90,28 +91,35 @@ public:
 
       try
       {
-        std::string name = std::string(controller_list[i]["name"]);
+        const std::string name = std::string(controller_list[i]["name"]);
 
         if (controller_list[i]["joints"].getType() != XmlRpc::XmlRpcValue::TypeArray)
         {
-          ROS_ERROR_STREAM_NAMED("MoveItFakeControllerManager", "The list of joints for controller "
-                                                                    << name << " is not specified as an array");
+          ROS_ERROR_STREAM_NAMED("MoveItFakeControllerManager",
+                                 "The list of joints for controller " << name << " is not specified as an array");
           continue;
         }
         std::vector<std::string> joints;
+        joints.reserve(controller_list[i]["joints"].size());
         for (int j = 0; j < controller_list[i]["joints"].size(); ++j)
-          joints.push_back(std::string(controller_list[i]["joints"][j]));
+          joints.emplace_back(std::string(controller_list[i]["joints"][j]));
 
         const std::string& type =
             controller_list[i].hasMember("type") ? std::string(controller_list[i]["type"]) : DEFAULT_TYPE;
         if (type == "last point")
-          controllers_[name].reset(new LastPointController(name, joints, pub_));
+          controllers_[name] = std::make_shared<LastPointController>(name, joints, pub_);
         else if (type == "via points")
-          controllers_[name].reset(new ViaPointController(name, joints, pub_));
+          controllers_[name] = std::make_shared<ViaPointController>(name, joints, pub_);
         else if (type == "interpolate")
-          controllers_[name].reset(new InterpolatingController(name, joints, pub_));
+          controllers_[name] = std::make_shared<InterpolatingController>(name, joints, pub_);
         else
           ROS_ERROR_STREAM("Unknown fake controller type: " << type);
+
+        moveit_controller_manager::MoveItControllerManager::ControllerState state;
+        state.default_ = controller_list[i].hasMember("default") ? (bool)controller_list[i]["default"] : false;
+        state.active_ = true;
+
+        controller_states_[name] = state;
       }
       catch (...)
       {
@@ -132,10 +140,12 @@ public:
     }
 
     robot_model_loader::RobotModelLoader robot_model_loader(ROBOT_DESCRIPTION);
-    robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
+    const moveit::core::RobotModelPtr& robot_model = robot_model_loader.getModel();
+    moveit::core::RobotState robot_state(robot_model);
     typedef std::map<std::string, double> JointPoseMap;
     JointPoseMap joints;
 
+    robot_state.setToDefaultValues();  // initialize all joint values (just in case...)
     for (int i = 0, end = param.size(); i != end; ++i)
     {
       try
@@ -148,7 +158,6 @@ public:
           continue;
         }
         moveit::core::JointModelGroup* jmg = robot_model->getJointModelGroup(group_name);
-        moveit::core::RobotState robot_state(robot_model);
         const std::vector<std::string>& joint_names = jmg->getActiveJointModelNames();
 
         if (!robot_state.setToDefaultValues(jmg, pose_name))
@@ -160,22 +169,21 @@ public:
         ROS_INFO_NAMED("loadInitialJointValues", "Set joints of group '%s' to pose '%s'.", group_name.c_str(),
                        pose_name.c_str());
 
-        for (std::vector<std::string>::const_iterator jit = joint_names.begin(), end = joint_names.end(); jit != end;
-             ++jit)
+        for (const std::string& joint_name : joint_names)
         {
-          const moveit::core::JointModel* jm = robot_state.getJointModel(*jit);
+          const moveit::core::JointModel* jm = robot_state.getJointModel(joint_name);
           if (!jm)
           {
-            ROS_WARN_STREAM_NAMED("loadInitialJointValues", "Unknown joint: " << *jit);
+            ROS_WARN_STREAM_NAMED("loadInitialJointValues", "Unknown joint: " << joint_name);
             continue;
           }
           if (jm->getVariableCount() != 1)
           {
-            ROS_WARN_STREAM_NAMED("loadInitialJointValues", "Cannot handle multi-variable joint: " << *jit);
+            ROS_WARN_STREAM_NAMED("loadInitialJointValues", "Cannot handle multi-variable joint: " << joint_name);
             continue;
           }
 
-          joints[*jit] = robot_state.getJointPositions(jm)[0];
+          joints[joint_name] = robot_state.getJointPositions(jm)[0];
         }
       }
       catch (...)
@@ -186,22 +194,20 @@ public:
     }
 
     // fill the joint state
-    for (JointPoseMap::const_iterator it = joints.begin(), end = joints.end(); it != end; ++it)
+    for (const auto& name_pos_pair : joints)
     {
-      js.name.push_back(it->first);
-      js.position.push_back(it->second);
+      js.name.push_back(name_pos_pair.first);
+      js.position.push_back(name_pos_pair.second);
     }
     return js;
   }
 
-  virtual ~MoveItFakeControllerManager()
-  {
-  }
+  ~MoveItFakeControllerManager() override = default;
 
   /*
    * Get a controller, by controller name (which was specified in the controllers.yaml
    */
-  virtual moveit_controller_manager::MoveItControllerHandlePtr getControllerHandle(const std::string& name)
+  moveit_controller_manager::MoveItControllerHandlePtr getControllerHandle(const std::string& name) override
   {
     std::map<std::string, BaseFakeControllerPtr>::const_iterator it = controllers_.find(name);
     if (it != controllers_.end())
@@ -214,7 +220,7 @@ public:
   /*
    * Get the list of controller names.
    */
-  virtual void getControllersList(std::vector<std::string>& names)
+  void getControllersList(std::vector<std::string>& names) override
   {
     for (std::map<std::string, BaseFakeControllerPtr>::const_iterator it = controllers_.begin();
          it != controllers_.end(); ++it)
@@ -225,7 +231,7 @@ public:
   /*
    * Fake controllers are always active
    */
-  virtual void getActiveControllers(std::vector<std::string>& names)
+  void getActiveControllers(std::vector<std::string>& names) override
   {
     getControllersList(names);
   }
@@ -241,7 +247,7 @@ public:
   /*
    * Get the list of joints that a controller can control.
    */
-  virtual void getControllerJoints(const std::string& name, std::vector<std::string>& joints)
+  void getControllerJoints(const std::string& name, std::vector<std::string>& joints) override
   {
     std::map<std::string, BaseFakeControllerPtr>::const_iterator it = controllers_.find(name);
     if (it != controllers_.end())
@@ -257,20 +263,15 @@ public:
     }
   }
 
-  /*
-   * Controllers are all active and default.
-   */
-  virtual moveit_controller_manager::MoveItControllerManager::ControllerState
-  getControllerState(const std::string& name)
+  moveit_controller_manager::MoveItControllerManager::ControllerState
+  getControllerState(const std::string& name) override
   {
-    moveit_controller_manager::MoveItControllerManager::ControllerState state;
-    state.active_ = true;
-    state.default_ = true;
-    return state;
+    return controller_states_[name];
   }
 
   /* Cannot switch our controllers */
-  virtual bool switchControllers(const std::vector<std::string>& activate, const std::vector<std::string>& deactivate)
+  bool switchControllers(const std::vector<std::string>& /*activate*/,
+                         const std::vector<std::string>& /*deactivate*/) override
   {
     return false;
   }
@@ -279,6 +280,7 @@ protected:
   ros::NodeHandle node_handle_;
   ros::Publisher pub_;
   std::map<std::string, BaseFakeControllerPtr> controllers_;
+  std::map<std::string, moveit_controller_manager::MoveItControllerManager::ControllerState> controller_states_;
 };
 
 }  // end namespace moveit_fake_controller_manager

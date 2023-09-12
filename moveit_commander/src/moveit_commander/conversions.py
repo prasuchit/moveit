@@ -32,19 +32,28 @@
 #
 # Author: Ioan Sucan
 
-import StringIO
-from moveit_commander import MoveItCommanderException
+try:
+    # Try Python 2.7 behaviour first
+    from StringIO import StringIO
+except ImportError:
+    # Use Python 3.x behaviour as fallback and choose the non-unicode version
+    from io import BytesIO as StringIO
+
+from .exception import MoveItCommanderException
 from geometry_msgs.msg import Pose, PoseStamped, Transform
 import rospy
 import tf
 
+
 def msg_to_string(msg):
-    buf = StringIO.StringIO()
+    buf = StringIO()
     msg.serialize(buf)
     return buf.getvalue()
 
+
 def msg_from_string(msg, data):
     msg.deserialize(data)
+
 
 def pose_to_list(pose_msg):
     pose = []
@@ -56,6 +65,7 @@ def pose_to_list(pose_msg):
     pose.append(pose_msg.orientation.z)
     pose.append(pose_msg.orientation.w)
     return pose
+
 
 def list_to_pose(pose_list):
     pose_msg = Pose()
@@ -71,14 +81,19 @@ def list_to_pose(pose_list):
         pose_msg.position.x = pose_list[0]
         pose_msg.position.y = pose_list[1]
         pose_msg.position.z = pose_list[2]
-        q = tf.transformations.quaternion_from_euler(pose_list[3], pose_list[4], pose_list[5])
+        q = tf.transformations.quaternion_from_euler(
+            pose_list[3], pose_list[4], pose_list[5]
+        )
         pose_msg.orientation.x = q[0]
         pose_msg.orientation.y = q[1]
         pose_msg.orientation.z = q[2]
         pose_msg.orientation.w = q[3]
     else:
-        raise MoveItCommanderException("Expected either 6 or 7 elements in list: (x,y,z,r,p,y) or (x,y,z,qx,qy,qz,qw)")
+        raise MoveItCommanderException(
+            "Expected either 6 or 7 elements in list: (x,y,z,r,p,y) or (x,y,z,qx,qy,qz,qw)"
+        )
     return pose_msg
+
 
 def list_to_pose_stamped(pose_list, target_frame):
     pose_msg = PoseStamped()
@@ -86,6 +101,7 @@ def list_to_pose_stamped(pose_list, target_frame):
     pose_msg.header.frame_id = target_frame
     pose_msg.header.stamp = rospy.Time.now()
     return pose_msg
+
 
 def transform_to_list(trf_msg):
     trf = []
@@ -97,6 +113,7 @@ def transform_to_list(trf_msg):
     trf.append(trf_msg.rotation.z)
     trf.append(trf_msg.rotation.w)
     return trf
+
 
 def list_to_transform(trf_list):
     trf_msg = Transform()

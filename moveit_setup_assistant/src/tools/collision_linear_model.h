@@ -34,16 +34,11 @@
 
 /* Author: Robert Haschke */
 
-#ifndef MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_COLLISION_LINEAR_MODEL_H
-#define MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_COLLISION_LINEAR_MODEL_H
+#pragma once
 
 #include <QAbstractProxyModel>
 #include <QSortFilterProxyModel>
 #include <QVector>
-
-#ifndef Q_MOC_RUN
-#include <moveit/setup_assistant/tools/compute_default_collisions.h>
-#endif
 
 #include "collision_matrix_model.h"
 
@@ -52,28 +47,27 @@ class CollisionLinearModel : public QAbstractProxyModel
   Q_OBJECT
 
 public:
-  CollisionLinearModel(CollisionMatrixModel* src, QObject* parent = NULL);
-  ~CollisionLinearModel();
+  CollisionLinearModel(CollisionMatrixModel* src, QObject* parent = nullptr);
+  ~CollisionLinearModel() override;
 
   // reimplement to return the model index in the proxy model that to the sourceIndex from the source model
-  QModelIndex mapFromSource(const QModelIndex& sourceIndex) const;
+  QModelIndex mapFromSource(const QModelIndex& sourceIndex) const override;
   // Reimplement this function to return the model index in the source model that corresponds to the proxyIndex in the
   // proxy model
-  QModelIndex mapToSource(const QModelIndex& proxyIndex) const;
+  QModelIndex mapToSource(const QModelIndex& proxyIndex) const override;
 
-  int rowCount(const QModelIndex& parent) const;
-  int columnCount(const QModelIndex& parent) const;
+  int rowCount(const QModelIndex& parent) const override;
+  int columnCount(const QModelIndex& parent) const override;
 
-  QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const;
-  QModelIndex parent(const QModelIndex& child) const;
-  QVariant data(const QModelIndex& index, int role) const;
-  moveit_setup_assistant::DisabledReason reason(int row) const;
+  QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
+  QModelIndex parent(const QModelIndex& child) const override;
+  QVariant data(const QModelIndex& index, int role) const override;
 
-  bool setData(const QModelIndex& index, const QVariant& value, int role);
+  bool setData(const QModelIndex& index, const QVariant& value, int role) override;
   void setEnabled(const QItemSelection& selection, bool value);
 
-  Qt::ItemFlags flags(const QModelIndex& index) const;
-  QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+  Qt::ItemFlags flags(const QModelIndex& index) const override;
+  QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 };
 
 /** proxy model to allow for sorting of CollisionLinearModel, considering sorting history */
@@ -82,15 +76,15 @@ class SortFilterProxyModel : public QSortFilterProxyModel
   Q_OBJECT
 
 public:
-  SortFilterProxyModel(QObject* parent = 0);
-  QVariant headerData(int section, Qt::Orientation orientation, int role) const;
-  void sort(int column, Qt::SortOrder order);
+  SortFilterProxyModel(QObject* parent = nullptr);
+  QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+  void sort(int column, Qt::SortOrder order) override;
   void setShowAll(bool show_all);
   void setEnabled(const QItemSelection& selection, bool value);
 
 protected:
-  bool filterAcceptsRow(int source_row, const QModelIndex& source_parent) const;
-  bool lessThan(const QModelIndex& src_left, const QModelIndex& src_right) const;
+  bool filterAcceptsRow(int source_row, const QModelIndex& source_parent) const override;
+  bool lessThan(const QModelIndex& src_left, const QModelIndex& src_right) const override;
 
 private Q_SLOTS:
   void initSorting();
@@ -100,5 +94,3 @@ private:
   QVector<int> sort_columns_;  // sorting history
   QVector<int> sort_orders_;   // corresponding sort orders
 };
-
-#endif  // MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_COLLISION_LINEAR_MODEL_H

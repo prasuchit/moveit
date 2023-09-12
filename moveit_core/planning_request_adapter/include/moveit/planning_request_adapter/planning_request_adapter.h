@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_PLANNING_REQUEST_ADAPTER_PLANNING_REQUEST_ADAPTER_
-#define MOVEIT_PLANNING_REQUEST_ADAPTER_PLANNING_REQUEST_ADAPTER_
+#pragma once
 
 #include <moveit/macros/class_forward.h>
 #include <moveit/planning_interface/planning_interface.h>
@@ -45,15 +44,14 @@
 /** \brief Generic interface to adapting motion planning requests */
 namespace planning_request_adapter
 {
-MOVEIT_CLASS_FORWARD(PlanningRequestAdapter);
+MOVEIT_CLASS_FORWARD(PlanningRequestAdapter);  // Defines PlanningRequestAdapterPtr, ConstPtr, WeakPtr... etc
 
 class PlanningRequestAdapter
 {
 public:
-  typedef boost::function<bool(const planning_scene::PlanningSceneConstPtr& planning_scene,
-                               const planning_interface::MotionPlanRequest& req,
-                               planning_interface::MotionPlanResponse& res)>
-      PlannerFn;
+  using PlannerFn =
+      boost::function<bool(const planning_scene::PlanningSceneConstPtr&, const planning_interface::MotionPlanRequest&,
+                           planning_interface::MotionPlanResponse&)>;
 
   PlanningRequestAdapter()
   {
@@ -62,6 +60,10 @@ public:
   virtual ~PlanningRequestAdapter()
   {
   }
+
+  /** \brief Initialize parameters using the passed NodeHandle
+      if no initialization is needed, simply implement as empty */
+  virtual void initialize(const ros::NodeHandle& node_handle) = 0;
 
   /// Get a short string that identifies the planning request adapter
   virtual std::string getDescription() const
@@ -116,6 +118,4 @@ public:
 private:
   std::vector<PlanningRequestAdapterConstPtr> adapters_;
 };
-}
-
-#endif
+}  // namespace planning_request_adapter

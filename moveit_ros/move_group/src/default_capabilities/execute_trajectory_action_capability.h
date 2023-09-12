@@ -34,14 +34,11 @@
 
 /*
  * Capability of execute trajectory with a ROS action.
- * In order to allow monitoring and stopping the execution,
- * the service should be turned into an action.
  *
  * Author: Kentaro Wada
  * */
 
-#ifndef MOVEIT_MOVE_GROUP_EXECUTE_TRAJECTORY_ACTION_CAPABILITY_
-#define MOVEIT_MOVE_GROUP_EXECUTE_TRAJECTORY_ACTION_CAPABILITY_
+#pragma once
 
 #include <moveit/move_group/move_group_capability.h>
 #include <actionlib/server/simple_action_server.h>
@@ -55,7 +52,7 @@ class MoveGroupExecuteTrajectoryAction : public MoveGroupCapability
 public:
   MoveGroupExecuteTrajectoryAction();
 
-  virtual void initialize();
+  void initialize() override;
 
 private:
   void executePathCallback(const moveit_msgs::ExecuteTrajectoryGoalConstPtr& goal);
@@ -68,5 +65,3 @@ private:
 };
 
 }  // namespace move_group
-
-#endif  // MOVEIT_MOVE_GROUP_EXECUTE_TRAJECTORY_ACTION_CAPABILITY_

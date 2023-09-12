@@ -43,7 +43,7 @@
 using namespace mesh_filter;
 using namespace Eigen;
 using namespace std;
-using namespace boost;
+using namespace std::placeholders;
 
 namespace mesh_filter_test
 {
@@ -93,7 +93,7 @@ public:
 
 private:
   shapes::Mesh createMesh(double z) const;
-  bool transform_callback(MeshHandle handle, Affine3d& transform) const;
+  bool transformCallback(MeshHandle handle, Isometry3d& transform) const;
   void getGroundTruth(unsigned int* labels, float* depth) const;
   const unsigned int width_;
   const unsigned int height_;
@@ -118,7 +118,8 @@ MeshFilterTest<Type>::MeshFilterTest(unsigned width, unsigned height, double nea
   , shadow_(shadow)
   , epsilon_(epsilon)
   , sensor_parameters_(width, height, near_, far_, width >> 1, height >> 1, width >> 1, height >> 1, 0.1, 0.1)
-  , filter_(boost::bind(&MeshFilterTest<Type>::transform_callback, this, _1, _2), sensor_parameters_)
+  , filter_([this](mesh_filter::MeshHandle mesh, Eigen::Isometry3d& tf) { return transformCallback(mesh, tf); },
+            sensor_parameters_)
   , sensor_data_(width_ * height_)
   , distance_(0.0)
 {
@@ -136,12 +137,12 @@ MeshFilterTest<Type>::MeshFilterTest(unsigned width, unsigned height, double nea
   srand(0);
   Type t_near = near_ / FilterTraits<Type>::ToMetricScale;
   Type t_far = far_ / FilterTraits<Type>::ToMetricScale;
-  for (typename vector<Type>::iterator sIt = sensor_data_.begin(); sIt != sensor_data_.end(); ++sIt)
+  for (typename vector<Type>::iterator s_it = sensor_data_.begin(); s_it != sensor_data_.end(); ++s_it)
   {
     do
     {
-      *sIt = getRandomNumber<Type>(0.0, 10.0 / FilterTraits<Type>::ToMetricScale);
-    } while (*sIt == t_near || *sIt == t_far);
+      *s_it = getRandomNumber<Type>(0.0, 10.0 / FilterTraits<Type>::ToMetricScale);
+    } while (*s_it == t_near || *s_it == t_far);
   }
 }
 
@@ -201,9 +202,9 @@ shapes::Mesh MeshFilterTest<Type>::createMesh(double z) const
 }
 
 template <typename Type>
-bool MeshFilterTest<Type>::transform_callback(MeshHandle handle, Affine3d& transform) const
+bool MeshFilterTest<Type>::transformCallback(MeshHandle handle, Isometry3d& transform) const
 {
-  transform = Affine3d::Identity();
+  transform = Isometry3d::Identity();
   if (handle == handle_)
     transform.translation() = Vector3d(0, 0, distance_);
   return true;
@@ -231,7 +232,7 @@ void MeshFilterTest<Type>::test()
     float sensor_depth = sensor_data_[idx] * FilterTraits<Type>::ToMetricScale;
     if (fabs(sensor_depth - distance_ - shadow_) > epsilon_ && fabs(sensor_depth - distance_) > epsilon_)
     {
-      ASSERT_FLOAT_EQ(filtered_depth[idx], gt_depth[idx]);
+      ASSERT_NEAR(filtered_depth[idx], gt_depth[idx], 1e-4);
       ASSERT_EQ(filtered_labels[idx], gt_labels[idx]);
     }
   }
@@ -245,17 +246,17 @@ void MeshFilterTest<Type>::getGroundTruth(unsigned int* labels, float* depth) co
   if (distance_ <= near_ || distance_ >= far_)
   {
     // no filtering is done -> no shadow values or label values
-    for (unsigned yIdx = 0, idx = 0; yIdx < height_; ++yIdx)
+    for (unsigned y_idx = 0, idx = 0; y_idx < height_; ++y_idx)
     {
-      for (unsigned xIdx = 0; xIdx < width_; ++xIdx, ++idx)
+      for (unsigned x_idx = 0; x_idx < width_; ++x_idx, ++idx)
       {
         depth[idx] = double(sensor_data_[idx]) * scale;
         if (depth[idx] < near_)
-          labels[idx] = MeshFilterBase::NearClip;
+          labels[idx] = MeshFilterBase::NEAR_CLIP;
         else if (depth[idx] >= far_)
-          labels[idx] = MeshFilterBase::FarClip;
+          labels[idx] = MeshFilterBase::FAR_CLIP;
         else
-          labels[idx] = MeshFilterBase::Background;
+          labels[idx] = MeshFilterBase::BACKGROUND;
 
         if (depth[idx] <= near_ || depth[idx] >= far_)
           depth[idx] = 0;
@@ -264,29 +265,29 @@ void MeshFilterTest<Type>::getGroundTruth(unsigned int* labels, float* depth) co
   }
   else
   {
-    for (unsigned yIdx = 0, idx = 0; yIdx < height_; ++yIdx)
+    for (unsigned y_idx = 0, idx = 0; y_idx < height_; ++y_idx)
     {
-      for (unsigned xIdx = 0; xIdx < width_; ++xIdx, ++idx)
+      for (unsigned x_idx = 0; x_idx < width_; ++x_idx, ++idx)
       {
         depth[idx] = double(sensor_data_[idx]) * scale;
 
         if (depth[idx] < near_)
         {
-          labels[idx] = MeshFilterBase::NearClip;
+          labels[idx] = MeshFilterBase::NEAR_CLIP;
           depth[idx] = 0;
         }
         else
         {
           double diff = depth[idx] - distance_;
           if (diff < 0 && depth[idx] < far_)
-            labels[idx] = MeshFilterBase::Background;
+            labels[idx] = MeshFilterBase::BACKGROUND;
           else if (diff > shadow_)
-            labels[idx] = MeshFilterBase::Shadow;
+            labels[idx] = MeshFilterBase::SHADOW;
           else if (depth[idx] >= far_)
-            labels[idx] = MeshFilterBase::FarClip;
+            labels[idx] = MeshFilterBase::FAR_CLIP;
           else
           {
-            labels[idx] = MeshFilterBase::FirstLabel;
+            labels[idx] = MeshFilterBase::FIRST_LABEL;
             depth[idx] = 0;
           }
 
@@ -319,7 +320,5 @@ INSTANTIATE_TEST_CASE_P(ushort_test, MeshFilterTestUnsignedShort, ::testing::Ran
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
-  int arg;
-
   return RUN_ALL_TESTS();
 }

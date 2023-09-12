@@ -35,7 +35,7 @@
 /* Author: Ioan Sucan */
 
 #include <moveit/collision_detection/collision_tools.h>
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 namespace collision_detection
 {
@@ -168,8 +168,7 @@ void intersectCostSources(std::set<CostSource>& cost_sources, const std::set<Cos
       tmp.aabb_max[1] = std::min(source_a.aabb_max[1], source_b.aabb_max[1]);
       tmp.aabb_max[2] = std::min(source_a.aabb_max[2], source_b.aabb_max[2]);
 
-      if (tmp.aabb_min[0] >= tmp.aabb_max[0] || tmp.aabb_min[1] >= tmp.aabb_max[1] ||
-          tmp.aabb_min[2] >= tmp.aabb_max[2])
+      if (tmp.aabb_min[0] >= tmp.aabb_max[0] || tmp.aabb_min[1] >= tmp.aabb_max[1] || tmp.aabb_min[2] >= tmp.aabb_max[2])
         continue;
       tmp.cost = std::max(source_a.cost, source_b.cost);
       cost_sources.insert(tmp);
@@ -272,8 +271,8 @@ void costSourceToMsg(const CostSource& cost_source, moveit_msgs::CostSource& msg
 
 void contactToMsg(const Contact& contact, moveit_msgs::ContactInformation& msg)
 {
-  tf::pointEigenToMsg(contact.pos, msg.position);
-  tf::vectorEigenToMsg(contact.normal, msg.normal);
+  msg.position = tf2::toMsg(contact.pos);
+  tf2::toMsg(contact.normal, msg.normal);
   msg.depth = contact.depth;
   msg.contact_body_1 = contact.body_name_1;
   msg.contact_body_2 = contact.body_name_2;

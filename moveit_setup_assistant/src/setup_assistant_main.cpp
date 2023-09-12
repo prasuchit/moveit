@@ -42,7 +42,7 @@
 #include <signal.h>
 #include <locale.h>
 
-static void siginthandler(int param)
+static void siginthandler(int /*param*/)
 {
   QApplication::quit();
 }
@@ -89,14 +89,14 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
 
   // Create Qt Application
-  QApplication qtApp(argc, argv);
+  QApplication qt_app(argc, argv);
   // numeric values should always be POSIX
   setlocale(LC_NUMERIC, "C");
 
   // Load Qt Widget
-  moveit_setup_assistant::SetupAssistantWidget saw(NULL, vm);
-  saw.setMinimumWidth(980);
-  saw.setMinimumHeight(550);
+  moveit_setup_assistant::SetupAssistantWidget saw(nullptr, vm);
+  saw.setMinimumWidth(1090);
+  saw.setMinimumHeight(600);
   //  saw.setWindowState( Qt::WindowMaximized );
 
   saw.show();
@@ -104,7 +104,7 @@ int main(int argc, char** argv)
   signal(SIGINT, siginthandler);
 
   // Wait here until Qt App is finished
-  const int result = qtApp.exec();
+  const int result = qt_app.exec();
 
   // Shutdown ROS
   ros::shutdown();

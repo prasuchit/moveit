@@ -34,8 +34,14 @@
 
 /* Author: Ioan Sucan */
 
+#include <moveit/moveit_cpp/moveit_cpp.h>
 #include <moveit/move_group/move_group_capability.h>
 #include <moveit/robot_state/conversions.h>
+#include <moveit/utils/moveit_error_code.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
+#include <sstream>
+#include <string>
 
 void move_group::MoveGroupCapability::setContext(const MoveGroupContextPtr& context)
 {
@@ -56,7 +62,7 @@ void move_group::MoveGroupCapability::convertToMsg(const std::vector<plan_execut
       {
         if (first && !trajectory[i].trajectory_->empty())
         {
-          robot_state::robotStateToRobotStateMsg(trajectory[i].trajectory_->getFirstWayPoint(), first_state_msg);
+          moveit::core::robotStateToRobotStateMsg(trajectory[i].trajectory_->getFirstWayPoint(), first_state_msg);
           first = false;
         }
         trajectory[i].trajectory_->getRobotTrajectoryMsg(trajectory_msg[i]);
@@ -71,7 +77,7 @@ void move_group::MoveGroupCapability::convertToMsg(const robot_trajectory::Robot
 {
   if (trajectory && !trajectory->empty())
   {
-    robot_state::robotStateToRobotStateMsg(trajectory->getFirstWayPoint(), first_state_msg);
+    moveit::core::robotStateToRobotStateMsg(trajectory->getFirstWayPoint(), first_state_msg);
     trajectory->getRobotTrajectoryMsg(trajectory_msg);
   }
 }
@@ -82,7 +88,7 @@ void move_group::MoveGroupCapability::convertToMsg(const std::vector<plan_execut
 {
   if (trajectory.size() > 1)
     ROS_ERROR_STREAM("Internal logic error: trajectory component ignored. !!! THIS IS A SERIOUS ERROR !!!");
-  if (trajectory.size() > 0)
+  if (!trajectory.empty())
     convertToMsg(trajectory[0].trajectory_, first_state_msg, trajectory_msg);
 }
 
@@ -111,45 +117,33 @@ move_group::MoveGroupCapability::clearSceneRobotState(const moveit_msgs::Plannin
 std::string move_group::MoveGroupCapability::getActionResultString(const moveit_msgs::MoveItErrorCodes& error_code,
                                                                    bool planned_trajectory_empty, bool plan_only)
 {
-  if (error_code.val == moveit_msgs::MoveItErrorCodes::SUCCESS)
+  switch (error_code.val)
   {
-    if (planned_trajectory_empty)
-      return "Requested path and goal constraints are already met.";
-    else
-    {
-      if (plan_only)
-        return "Motion plan was computed succesfully.";
+    case moveit_msgs::MoveItErrorCodes::SUCCESS:
+      if (planned_trajectory_empty)
+        return "Requested path and goal constraints are already met.";
       else
-        return "Solution was found and executed.";
-    }
+      {
+        if (plan_only)
+          return "Motion plan was computed succesfully.";
+        else
+          return "Solution was found and executed.";
+      }
+    case moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME:
+      return "Invalid group in motion plan request";
+    case moveit_msgs::MoveItErrorCodes::PLANNING_FAILED:
+    case moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN:
+      if (planned_trajectory_empty)
+        return "No motion plan found. No execution attempted.";
+      else
+        return "Motion plan was found but it seems to be invalid (possibly due to postprocessing). Not executing.";
+    case moveit_msgs::MoveItErrorCodes::UNABLE_TO_AQUIRE_SENSOR_DATA:
+      return "Motion plan was found but it seems to be too costly and looking around did not help.";
+    case moveit_msgs::MoveItErrorCodes::MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+      return "Solution found but the environment changed during execution and the path was aborted";
+    default:
+      return moveit::core::MoveItErrorCode::toString(error_code);
   }
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::INVALID_GROUP_NAME)
-    return "Must specify group in motion plan request";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::PLANNING_FAILED ||
-           error_code.val == moveit_msgs::MoveItErrorCodes::INVALID_MOTION_PLAN)
-  {
-    if (planned_trajectory_empty)
-      return "No motion plan found. No execution attempted.";
-    else
-      return "Motion plan was found but it seems to be invalid (possibly due to postprocessing). Not executing.";
-  }
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::UNABLE_TO_AQUIRE_SENSOR_DATA)
-    return "Motion plan was found but it seems to be too costly and looking around did not help.";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE)
-    return "Solution found but the environment changed during execution and the path was aborted";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::CONTROL_FAILED)
-    return "Solution found but controller failed during execution";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::TIMED_OUT)
-    return "Timeout reached";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::PREEMPTED)
-    return "Preempted";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::INVALID_GOAL_CONSTRAINTS)
-    return "Invalid goal constraints";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::INVALID_OBJECT_NAME)
-    return "Invalid object name";
-  else if (error_code.val == moveit_msgs::MoveItErrorCodes::FAILURE)
-    return "Catastrophic failure";
-  return "Unknown event";
 }
 
 std::string move_group::MoveGroupCapability::stateToStr(MoveGroupState state) const
@@ -184,23 +178,42 @@ bool move_group::MoveGroupCapability::performTransform(geometry_msgs::PoseStampe
 
   try
   {
-    std::string error;
-    ros::Time common_time;
-    context_->planning_scene_monitor_->getTFClient()->getLatestCommonTime(pose_msg.header.frame_id, target_frame,
-                                                                          common_time, &error);
-    if (!error.empty())
-      ROS_ERROR("TF Problem: %s", error.c_str());
-
-    tf::Stamped<tf::Pose> pose_tf, pose_tf_out;
-    tf::poseStampedMsgToTF(pose_msg, pose_tf);
-    pose_tf.stamp_ = common_time;
-    context_->planning_scene_monitor_->getTFClient()->transformPose(target_frame, pose_tf, pose_tf_out);
-    tf::poseStampedTFToMsg(pose_tf_out, pose_msg);
+    geometry_msgs::TransformStamped common_tf = context_->planning_scene_monitor_->getTFClient()->lookupTransform(
+        pose_msg.header.frame_id, target_frame, ros::Time(0.0));
+    geometry_msgs::PoseStamped pose_msg_in(pose_msg);
+    pose_msg_in.header.stamp = common_tf.header.stamp;
+    context_->planning_scene_monitor_->getTFClient()->transform(pose_msg_in, pose_msg, target_frame);
   }
-  catch (tf::TransformException& ex)
+  catch (tf2::TransformException& ex)
   {
     ROS_ERROR("TF Problem: %s", ex.what());
     return false;
   }
   return true;
+}
+
+planning_pipeline::PlanningPipelinePtr
+move_group::MoveGroupCapability::resolvePlanningPipeline(const std::string& pipeline_id) const
+{
+  if (pipeline_id.empty())
+  {
+    // Without specified planning pipeline we use the default
+    return context_->planning_pipeline_;
+  }
+  else
+  {
+    // Attempt to get the planning pipeline for the specified identifier
+    try
+    {
+      auto pipeline = context_->moveit_cpp_->getPlanningPipelines().at(pipeline_id);
+      ROS_INFO_NAMED(getName(), "Using planning pipeline '%s'", pipeline_id.c_str());
+      return pipeline;
+    }
+    catch (const std::out_of_range&)
+    {
+      ROS_WARN_NAMED(getName(), "Couldn't find requested planning pipeline '%s'", pipeline_id.c_str());
+    }
+  }
+
+  return planning_pipeline::PlanningPipelinePtr();
 }

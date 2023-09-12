@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_MOVE_GROUP_CARTESIAN_PATH_SERVICE_CAPABILITY_
-#define MOVEIT_MOVE_GROUP_CARTESIAN_PATH_SERVICE_CAPABILITY_
+#pragma once
 
 #include <moveit/move_group/move_group_capability.h>
 #include <moveit_msgs/GetCartesianPath.h>
@@ -47,7 +46,7 @@ class MoveGroupCartesianPathService : public MoveGroupCapability
 public:
   MoveGroupCartesianPathService();
 
-  virtual void initialize();
+  void initialize() override;
 
 private:
   bool computeService(moveit_msgs::GetCartesianPath::Request& req, moveit_msgs::GetCartesianPath::Response& res);
@@ -56,6 +55,4 @@ private:
   ros::Publisher display_path_;
   bool display_computed_paths_;
 };
-}
-
-#endif
+}  // namespace move_group

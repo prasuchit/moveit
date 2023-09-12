@@ -34,15 +34,15 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_CONSTRAINT_SAMPLER_MANAGER_LOADER_
-#define MOVEIT_CONSTRAINT_SAMPLER_MANAGER_LOADER_
+#pragma once
 
 #include <moveit/constraint_samplers/constraint_sampler_manager.h>
 #include <moveit/macros/class_forward.h>
 
 namespace constraint_sampler_manager_loader
 {
-MOVEIT_CLASS_FORWARD(ConstraintSamplerManagerLoader);
+MOVEIT_CLASS_FORWARD(
+    ConstraintSamplerManagerLoader);  // Defines ConstraintSamplerManagerLoaderPtr, ConstPtr, WeakPtr... etc
 
 class ConstraintSamplerManagerLoader
 {
@@ -58,9 +58,7 @@ public:
 private:
   constraint_samplers::ConstraintSamplerManagerPtr constraint_sampler_manager_;
 
-  MOVEIT_CLASS_FORWARD(Helper)
+  MOVEIT_CLASS_FORWARD(Helper);
   HelperPtr impl_;
 };
-}
-
-#endif
+}  // namespace constraint_sampler_manager_loader

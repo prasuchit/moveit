@@ -34,25 +34,25 @@
 
 /* Author: Ioan Sucan, Adam Leeper */
 
-#ifndef MOVEIT_ROBOT_INTERACTION_INTERACTION_HANDLER_
-#define MOVEIT_ROBOT_INTERACTION_INTERACTION_HANDLER_
+#pragma once
 
+#include <geometry_msgs/PoseStamped.h>
 #include <moveit/macros/class_forward.h>
 #include <moveit/robot_interaction/locked_robot_state.h>
 //#include <moveit/robot_interaction/robot_interaction.h>
 #include <visualization_msgs/InteractiveMarkerFeedback.h>
 #include <interactive_markers/menu_handler.h>
-#include <tf/tf.h>
+#include <tf2_ros/buffer.h>
 
 namespace robot_interaction
 {
-MOVEIT_CLASS_FORWARD(InteractionHandler);
-MOVEIT_CLASS_FORWARD(RobotInteraction);
-MOVEIT_CLASS_FORWARD(KinematicOptionsMap);
+MOVEIT_CLASS_FORWARD(InteractionHandler);   // Defines InteractionHandlerPtr, ConstPtr, WeakPtr... etc
+MOVEIT_CLASS_FORWARD(RobotInteraction);     // Defines RobotInteractionPtr, ConstPtr, WeakPtr... etc
+MOVEIT_CLASS_FORWARD(KinematicOptionsMap);  // Defines KinematicOptionsMapPtr, ConstPtr, WeakPtr... etc
 
-class EndEffectorInteraction;
-class JointInteraction;
-class GenericInteraction;
+struct EndEffectorInteraction;
+struct JointInteraction;
+struct GenericInteraction;
 
 /// Function type for notifying client of RobotState changes.
 ///
@@ -78,21 +78,21 @@ class InteractionHandler : public LockedRobotState
 public:
   // Use this constructor if you have an initial RobotState already.
   InteractionHandler(const RobotInteractionPtr& robot_interaction, const std::string& name,
-                     const robot_state::RobotState& initial_robot_state,
-                     const boost::shared_ptr<tf::Transformer>& tf = boost::shared_ptr<tf::Transformer>());
+                     const moveit::core::RobotState& initial_robot_state,
+                     const std::shared_ptr<tf2_ros::Buffer>& tf_buffer = std::shared_ptr<tf2_ros::Buffer>());
 
   // Use this constructor to start with a default state.
   InteractionHandler(const RobotInteractionPtr& robot_interaction, const std::string& name,
-                     const boost::shared_ptr<tf::Transformer>& tf = boost::shared_ptr<tf::Transformer>());
+                     const std::shared_ptr<tf2_ros::Buffer>& tf_buffer = std::shared_ptr<tf2_ros::Buffer>());
 
   // DEPRECATED.
-  InteractionHandler(const std::string& name, const robot_state::RobotState& initial_robot_state,
-                     const boost::shared_ptr<tf::Transformer>& tf = boost::shared_ptr<tf::Transformer>());
+  InteractionHandler(const std::string& name, const moveit::core::RobotState& initial_robot_state,
+                     const std::shared_ptr<tf2_ros::Buffer>& tf_buffer = std::shared_ptr<tf2_ros::Buffer>());
   // DEPRECATED.
-  InteractionHandler(const std::string& name, const robot_model::RobotModelConstPtr& model,
-                     const boost::shared_ptr<tf::Transformer>& tf = boost::shared_ptr<tf::Transformer>());
+  InteractionHandler(const std::string& name, const moveit::core::RobotModelConstPtr& model,
+                     const std::shared_ptr<tf2_ros::Buffer>& tf_buffer = std::shared_ptr<tf2_ros::Buffer>());
 
-  virtual ~InteractionHandler()
+  ~InteractionHandler() override
   {
   }
 
@@ -216,12 +216,7 @@ public:
 
   /** \brief Clear any error settings.
    * This makes the markers appear as if the state is no longer invalid. */
-  void clearError(void);
-
-  /** \brief This should only be called by RobotInteraction.
-   * Associates this InteractionHandler to a RobotInteraction.
-   */
-  void setRobotInteraction(RobotInteraction* robot_interaction);
+  void clearError();
 
 protected:
   bool transformFeedbackPose(const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback,
@@ -229,26 +224,26 @@ protected:
 
   const std::string name_;
   const std::string planning_frame_;
-  boost::shared_ptr<tf::Transformer> tf_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 
 private:
   typedef boost::function<void(InteractionHandler*)> StateChangeCallbackFn;
 
   // Update RobotState using a generic interaction feedback message.
   // YOU MUST LOCK state_lock_ BEFORE CALLING THIS.
-  void updateStateGeneric(robot_state::RobotState* state, const GenericInteraction* g,
-                          const visualization_msgs::InteractiveMarkerFeedbackConstPtr* feedback,
-                          StateChangeCallbackFn* callback);
+  void updateStateGeneric(moveit::core::RobotState& state, const GenericInteraction& g,
+                          const visualization_msgs::InteractiveMarkerFeedbackConstPtr& feedback,
+                          StateChangeCallbackFn& callback);
 
   // Update RobotState for a new pose of an eef.
   // YOU MUST LOCK state_lock_ BEFORE CALLING THIS.
-  void updateStateEndEffector(robot_state::RobotState* state, const EndEffectorInteraction* eef,
-                              const geometry_msgs::Pose* pose, StateChangeCallbackFn* callback);
+  void updateStateEndEffector(moveit::core::RobotState& state, const EndEffectorInteraction& eef,
+                              const geometry_msgs::Pose& pose, StateChangeCallbackFn& callback);
 
   // Update RobotState for a new joint position.
   // YOU MUST LOCK state_lock_ BEFORE CALLING THIS.
-  void updateStateJoint(robot_state::RobotState* state, const JointInteraction* vj, const geometry_msgs::Pose* pose,
-                        StateChangeCallbackFn* callback);
+  void updateStateJoint(moveit::core::RobotState& state, const JointInteraction& vj, const geometry_msgs::Pose& pose,
+                        StateChangeCallbackFn& callback);
 
   // Set the error state for \e name.
   // Returns true if the error state for \e name changed.
@@ -276,15 +271,6 @@ private:
   // robot state that satisfies the feedback pose.
   // PROTECTED BY pose_map_lock_
   std::map<std::string, geometry_msgs::PoseStamped> pose_map_;
-
-  // The RobotInteraction we are associated with.
-  // This is never safe to use because the RobotInteraction could be deleted at
-  // any time.
-  // Therefore it is stored as a void* to discourage its use.
-  // This is only used inside setKinematicOptions() with the state_lock_ held.
-  // That function should only be called from RobotInteraction methods.
-  // PROTECTED BY state_lock_
-  const void* robot_interaction_;
 
   boost::mutex pose_map_lock_;
   boost::mutex offset_map_lock_;
@@ -323,19 +309,5 @@ private:
 
   // remove '_' characters from name
   static std::string fixName(std::string name);
-
-public:
-  // DEPRECATED FUNCTIONS.
-  // DO NOT USE THESE.  Instead access the KinematicOptions by calling
-  // RobotInteraction::getKinematicOptionsMap()
-  void setGroupStateValidityCallback(const robot_state::GroupStateValidityCallbackFn& callback);
-  void setIKTimeout(double timeout);
-  void setIKAttempts(unsigned int attempts);
-  kinematics::KinematicsQueryOptions getKinematicsQueryOptions() const;
-  void setKinematicsQueryOptions(const kinematics::KinematicsQueryOptions& opt);
-  void setKinematicsQueryOptionsForGroup(const std::string& group_name,
-                                         const kinematics::KinematicsQueryOptions& options);
 };
-}
-
-#endif
+}  // namespace robot_interaction

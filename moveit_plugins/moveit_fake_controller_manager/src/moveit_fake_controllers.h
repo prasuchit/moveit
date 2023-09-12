@@ -46,7 +46,7 @@
 
 namespace moveit_fake_controller_manager
 {
-MOVEIT_CLASS_FORWARD(BaseFakeController);
+MOVEIT_CLASS_FORWARD(BaseFakeController);  // Defines BaseFakeControllerPtr, ConstPtr, WeakPtr... etc
 
 // common base class to all fake controllers in this package
 class BaseFakeController : public moveit_controller_manager::MoveItControllerHandle
@@ -54,7 +54,7 @@ class BaseFakeController : public moveit_controller_manager::MoveItControllerHan
 public:
   BaseFakeController(const std::string& name, const std::vector<std::string>& joints, const ros::Publisher& pub);
 
-  virtual moveit_controller_manager::ExecutionStatus getLastExecutionStatus();
+  moveit_controller_manager::ExecutionStatus getLastExecutionStatus() override;
   void getJoints(std::vector<std::string>& joints) const;
 
 protected:
@@ -66,23 +66,23 @@ class LastPointController : public BaseFakeController
 {
 public:
   LastPointController(const std::string& name, const std::vector<std::string>& joints, const ros::Publisher& pub);
-  ~LastPointController();
+  ~LastPointController() override;
 
-  virtual bool sendTrajectory(const moveit_msgs::RobotTrajectory& t);
-  virtual bool cancelExecution();
-  virtual bool waitForExecution(const ros::Duration&);
+  bool sendTrajectory(const moveit_msgs::RobotTrajectory& t) override;
+  bool cancelExecution() override;
+  bool waitForExecution(const ros::Duration& /*timeout*/) override;
 };
 
 class ThreadedController : public BaseFakeController
 {
 public:
   ThreadedController(const std::string& name, const std::vector<std::string>& joints, const ros::Publisher& pub);
-  ~ThreadedController();
+  ~ThreadedController() override;
 
-  virtual bool sendTrajectory(const moveit_msgs::RobotTrajectory& t);
-  virtual bool cancelExecution();
-  virtual bool waitForExecution(const ros::Duration&);
-  virtual moveit_controller_manager::ExecutionStatus getLastExecutionStatus();
+  bool sendTrajectory(const moveit_msgs::RobotTrajectory& t) override;
+  bool cancelExecution() override;
+  bool waitForExecution(const ros::Duration& /*timeout*/) override;
+  moveit_controller_manager::ExecutionStatus getLastExecutionStatus() override;
 
 protected:
   bool cancelled()
@@ -104,24 +104,24 @@ class ViaPointController : public ThreadedController
 {
 public:
   ViaPointController(const std::string& name, const std::vector<std::string>& joints, const ros::Publisher& pub);
-  ~ViaPointController();
+  ~ViaPointController() override;
 
 protected:
-  virtual void execTrajectory(const moveit_msgs::RobotTrajectory& t);
+  void execTrajectory(const moveit_msgs::RobotTrajectory& t) override;
 };
 
 class InterpolatingController : public ThreadedController
 {
 public:
   InterpolatingController(const std::string& name, const std::vector<std::string>& joints, const ros::Publisher& pub);
-  ~InterpolatingController();
+  ~InterpolatingController() override;
 
 protected:
-  virtual void execTrajectory(const moveit_msgs::RobotTrajectory& t);
+  void execTrajectory(const moveit_msgs::RobotTrajectory& t) override;
 
 private:
   ros::WallRate rate_;
 };
-}
+}  // namespace moveit_fake_controller_manager
 
 #endif

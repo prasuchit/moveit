@@ -53,11 +53,11 @@ public:
     : owner_(owner), dynamic_reconfigure_server_(ros::NodeHandle("~/sense_for_plan"))
   {
     dynamic_reconfigure_server_.setCallback(
-        boost::bind(&DynamicReconfigureImpl::dynamicReconfigureCallback, this, _1, _2));
+        [this](const auto& config, uint32_t level) { dynamicReconfigureCallback(config, level); });
   }
 
 private:
-  void dynamicReconfigureCallback(SenseForPlanDynamicReconfigureConfig& config, uint32_t level)
+  void dynamicReconfigureCallback(const SenseForPlanDynamicReconfigureConfig& config, uint32_t /*level*/)
   {
     owner_->setMaxSafePathCost(config.max_safe_path_cost);
     owner_->setMaxCostSources(config.max_cost_sources);
@@ -68,7 +68,7 @@ private:
   PlanWithSensing* owner_;
   dynamic_reconfigure::Server<SenseForPlanDynamicReconfigureConfig> dynamic_reconfigure_server_;
 };
-}
+}  // namespace plan_execution
 
 plan_execution::PlanWithSensing::PlanWithSensing(
     const trajectory_execution_manager::TrajectoryExecutionManagerPtr& trajectory_execution)
@@ -88,8 +88,8 @@ plan_execution::PlanWithSensing::PlanWithSensing(
   {
     try
     {
-      sensor_manager_loader_.reset(new pluginlib::ClassLoader<moveit_sensor_manager::MoveItSensorManager>(
-          "moveit_core", "moveit_sensor_manager::MoveItSensorManager"));
+      sensor_manager_loader_ = std::make_unique<pluginlib::ClassLoader<moveit_sensor_manager::MoveItSensorManager>>(
+          "moveit_core", "moveit_sensor_manager::MoveItSensorManager");
     }
     catch (pluginlib::PluginlibException& ex)
     {
@@ -150,7 +150,7 @@ bool plan_execution::PlanWithSensing::computePlan(ExecutableMotionPlan& plan,
   unsigned int look_attempts = 0;
 
   // this flag is set to true when all conditions for looking around are met, and the command is sent.
-  // the intention is for the planning looop not to terminate when having just looked around
+  // the intention is for the planning loop not to terminate when having just looked around
   bool just_looked_around = false;
 
   // this flag indicates whether the last lookAt() operation failed. If this operation fails once, we assume that
@@ -212,7 +212,7 @@ bool plan_execution::PlanWithSensing::computePlan(ExecutableMotionPlan& plan,
 
       bool looked_at_result = lookAt(cost_sources, plan.planning_scene_->getPlanningFrame());
       if (looked_at_result)
-        ROS_INFO("Sensor was succesfully actuated. Attempting to recompute a motion plan.");
+        ROS_INFO("Sensor was successfully actuated. Attempting to recompute a motion plan.");
       else
       {
         if (look_around_failed)
@@ -248,7 +248,7 @@ bool plan_execution::PlanWithSensing::lookAt(const std::set<collision_detection:
 {
   if (!sensor_manager_)
   {
-    ROS_WARN("It seems looking around would be useful, but no MoveIt! Sensor Manager is loaded. Did you set "
+    ROS_WARN("It seems looking around would be useful, but no MoveIt Sensor Manager is loaded. Did you set "
              "~moveit_sensor_manager ?");
     return false;
   }
@@ -259,14 +259,14 @@ bool plan_execution::PlanWithSensing::lookAt(const std::set<collision_detection:
   std::vector<std::string> names;
   sensor_manager_->getSensorsList(names);
   geometry_msgs::PointStamped point;
-  for (std::size_t i = 0; i < names.size(); ++i)
+  for (const std::string& name : names)
     if (collision_detection::getSensorPositioning(point.point, cost_sources))
     {
       point.header.stamp = ros::Time::now();
       point.header.frame_id = frame_id;
-      ROS_DEBUG_STREAM("Pointing sensor " << names[i] << " to:\n" << point);
+      ROS_DEBUG_STREAM("Pointing sensor " << name << " to:\n" << point);
       moveit_msgs::RobotTrajectory sensor_trajectory;
-      if (sensor_manager_->pointSensorTo(names[i], point, sensor_trajectory))
+      if (sensor_manager_->pointSensorTo(name, point, sensor_trajectory))
       {
         if (!trajectory_processing::isTrajectoryEmpty(sensor_trajectory))
           return trajectory_execution_manager_->push(sensor_trajectory) &&

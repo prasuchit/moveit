@@ -34,32 +34,33 @@
 
 /* Author: Dave Coleman */
 
-#ifndef MOVEIT_MOVEIT_SETUP_ASSISTANT_WIDGETS_DEFAULT_COLLISIONS_WIDGET__
-#define MOVEIT_MOVEIT_SETUP_ASSISTANT_WIDGETS_DEFAULT_COLLISIONS_WIDGET__
-
-#include <QWidget>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QTableView>
-#include <QSlider>
-#include <QPushButton>
-#include <QGroupBox>
-#include <QProgressBar>
-#include <QCheckBox>
-#include <QRadioButton>
-#include <QSpinBox>
+#pragma once
 #include <QThread>
-#include <QLineEdit>
-#include <QAction>
+class QAbstractItemModel;
+class QAction;
+class QButtonGroup;
+class QCheckBox;
+class QGroupBox;
+class QHeaderView;
+class QItemSelection;
+class QItemSelectionModel;
+class QLabel;
+class QLineEdit;
+class QProgressBar;
+class QPushButton;
+class QRadioButton;
+class QSlider;
+class QSpinBox;
+class QTableView;
+class QVBoxLayout;
 
 #ifndef Q_MOC_RUN
-#include <boost/thread.hpp>
-#include <boost/function.hpp>
-#include <moveit/setup_assistant/tools/compute_default_collisions.h>
+#include <boost/thread/thread.hpp>
+#include <boost/function/function_fwd.hpp>
 #include <moveit/setup_assistant/tools/moveit_config_data.h>
+#include <moveit/setup_assistant/tools/compute_default_collisions.h>
 #endif
 
-#include "header_widget.h"
 #include "setup_screen_widget.h"  // a base class for screens in the setup assistant
 
 namespace moveit_setup_assistant
@@ -76,8 +77,8 @@ class DefaultCollisionsWidget : public SetupScreenWidget
 public:
   enum ViewMode
   {
-    MatrixMode = 0,
-    LinearMode = 1
+    MATRIX_MODE = 0,
+    LINEAR_MODE = 1
   };
 
   // ******************************************************************************************
@@ -88,18 +89,8 @@ public:
    * \brief User interface for editing the default collision matrix list in an SRDF
    * \param urdf_file String srdf file location. It will create a new file or will edit an existing one
    */
-  DefaultCollisionsWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data);
-  ~DefaultCollisionsWidget();
-
-  /**
-   * \brief Output Link Pairs to SRDF Format
-   */
-  void linkPairsToSRDF();
-
-  /**
-   * \brief Load Link Pairs from SRDF Format
-   */
-  void linkPairsFromSRDF();
+  DefaultCollisionsWidget(QWidget* parent, const MoveItConfigDataPtr& config_data);
+  ~DefaultCollisionsWidget() override;
 
 private Q_SLOTS:
 
@@ -143,20 +134,20 @@ private Q_SLOTS:
   void revertChanges();
 
   /**
-  * \brief Called when current row has changed
-  */
+   * \brief Called when current row has changed
+   */
   void previewSelectedMatrix(const QModelIndex& index);
   void previewSelectedLinear(const QModelIndex& index);
 
   /**
    * \brief Called when setup assistant navigation switches to this screen
    */
-  void focusGiven();
+  void focusGiven() override;
 
   /**
    * \brief Called when setup assistant navigation switches away from this screen
    */
-  bool focusLost();
+  bool focusLost() override;
 
   void showHeaderContextMenu(const QPoint& p);
   void hideSections();
@@ -194,11 +185,10 @@ private:
   // ******************************************************************************************
   MonitorThread* worker_;
 
-  /// main storage of link pair data
-  moveit_setup_assistant::LinkPairMap link_pairs_;
-
   /// Contains all the configuration data for the setup assistant
   moveit_setup_assistant::MoveItConfigDataPtr config_data_;
+  /// Working copy of SRDF config
+  srdf::SRDFWriterPtr wip_srdf_;
 
   // ******************************************************************************************
   // Private Functions
@@ -217,31 +207,30 @@ private:
    */
   void disableControls(bool disable);
 
-  /**
-   * \brief Allow toggling of all checkboxes in selection by filtering <space> keypresses
-   */
-  bool eventFilter(QObject* object, QEvent* event);
+  /** Allow toggling of all checkboxes in selection by filtering <space> keypresses */
+  bool eventFilter(QObject* object, QEvent* event) override;
 
-  /**
-   * \brief Show header's sections in logicalIndexes and everything in between
-   */
+  /** Return list of selected sections */
+  QList<int> selectedSections(QHeaderView*& header) const;
+
+  /** Show header's sections in logicalIndexes and everything in between */
   void showSections(QHeaderView* header, const QList<int>& logicalIndexes);
-  /**
-   * \brief Toggle enabled status of selection
-   */
+
+  /** Enable/Disable selected sections by default */
+  void setDefaults(bool enabled);
+
+  /** Toggle enabled status of selection */
   void toggleSelection(QItemSelection selection);
 };
 
-/**
- * \brief QThread to monitor progress of a boost::thread
- */
+/** QThread to monitor progress of a boost::thread */
 class MonitorThread : public QThread
 {
   Q_OBJECT
 
 public:
-  MonitorThread(const boost::function<void(unsigned int*)>& f, QProgressBar* progress_bar = NULL);
-  void run();
+  MonitorThread(const boost::function<void(unsigned int*)>& f, QProgressBar* progress_bar = nullptr);
+  void run() override;
   void cancel()
   {
     canceled_ = true;
@@ -252,13 +241,11 @@ public:
   }
 
 Q_SIGNALS:
-  void progress(int);
+  void progress(int /*_t1*/);
 
 private:
   boost::thread worker_;
   unsigned int progress_;
   bool canceled_;
 };
-}
-
-#endif
+}  // namespace moveit_setup_assistant

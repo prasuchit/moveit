@@ -36,16 +36,21 @@
 
 // SA
 #include "passive_joints_widget.h"
+#include "header_widget.h"
+#include "double_list_widget.h"
+
 // Qt
 #include <QFormLayout>
+#include <QLabel>
 #include <QMessageBox>
+#include <QTableWidget>
 
 namespace moveit_setup_assistant
 {
 // ******************************************************************************************
 // Constructor
 // ******************************************************************************************
-PassiveJointsWidget::PassiveJointsWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data)
+PassiveJointsWidget::PassiveJointsWidget(QWidget* parent, const MoveItConfigDataPtr& config_data)
   : SetupScreenWidget(parent), config_data_(config_data)
 {
   // Basic widget container
@@ -53,8 +58,9 @@ PassiveJointsWidget::PassiveJointsWidget(QWidget* parent, moveit_setup_assistant
 
   // Top Header Area ------------------------------------------------
 
-  HeaderWidget* header = new HeaderWidget("Passive Joints", "Specify the set of passive joints (not actuated). Joint "
-                                                            "state is not expected to be published for these joints.",
+  HeaderWidget* header = new HeaderWidget("Define Passive Joints",
+                                          "Specify the set of passive joints (not actuated). Joint "
+                                          "state is not expected to be published for these joints.",
                                           this);
   layout->addWidget(header);
 
@@ -83,27 +89,27 @@ void PassiveJointsWidget::focusGiven()
   joints_widget_->clearContents();
 
   // Retrieve pointer to the shared kinematic model
-  const robot_model::RobotModelConstPtr& model = config_data_->getRobotModel();
+  const moveit::core::RobotModelConstPtr& model = config_data_->getRobotModel();
 
   // Get the names of the all joints
   const std::vector<std::string>& joints = model->getJointModelNames();
 
-  if (joints.size() == 0)
+  if (joints.empty())
   {
     QMessageBox::critical(this, "Error Loading", "No joints found for robot model");
     return;
   }
   std::vector<std::string> active_joints;
-  for (std::size_t i = 0; i < joints.size(); ++i)
-    if (model->getJointModel(joints[i])->getVariableCount() > 0)
-      active_joints.push_back(joints[i]);
+  for (const std::string& joint : joints)
+    if (model->getJointModel(joint)->getVariableCount() > 0)
+      active_joints.push_back(joint);
 
   // Set the available joints (left box)
   joints_widget_->setAvailable(active_joints);
 
   std::vector<std::string> passive_joints;
-  for (std::size_t i = 0; i < config_data_->srdf_->passive_joints_.size(); ++i)
-    passive_joints.push_back(config_data_->srdf_->passive_joints_[i].name_);
+  for (srdf::Model::PassiveJoint& passive_joint : config_data_->srdf_->passive_joints_)
+    passive_joints.push_back(passive_joint.name_);
   joints_widget_->setSelected(passive_joints);
 }
 
@@ -125,14 +131,14 @@ void PassiveJointsWidget::selectionUpdated()
 // ******************************************************************************************
 // Called from Double List widget to highlight joints
 // ******************************************************************************************
-void PassiveJointsWidget::previewSelectedJoints(std::vector<std::string> joints)
+void PassiveJointsWidget::previewSelectedJoints(const std::vector<std::string>& joints)
 {
   // Unhighlight all links
   Q_EMIT unhighlightAll();
 
-  for (std::size_t i = 0; i < joints.size(); ++i)
+  for (const std::string& joint : joints)
   {
-    const robot_model::JointModel* joint_model = config_data_->getRobotModel()->getJointModel(joints[i]);
+    const moveit::core::JointModel* joint_model = config_data_->getRobotModel()->getJointModel(joint);
 
     // Check that a joint model was found
     if (!joint_model)
@@ -153,4 +159,4 @@ void PassiveJointsWidget::previewSelectedJoints(std::vector<std::string> joints)
   }
 }
 
-}  // namespace
+}  // namespace moveit_setup_assistant

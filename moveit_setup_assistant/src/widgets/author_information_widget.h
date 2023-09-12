@@ -34,18 +34,14 @@
 
 /* Author: Dave Coleman, Michael 'v4hn' Goerner */
 
-#ifndef MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_AUTHOR_INFORMATION_WIDGET_
-#define MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_AUTHOR_INFORMATION_WIDGET_
+#pragma once
 
-#include <QWidget>
-#include <QString>
-#include <QLineEdit>
+class QLineEdit;
 
 #ifndef Q_MOC_RUN
 #include <moveit/setup_assistant/tools/moveit_config_data.h>
 #endif
 
-#include "header_widget.h"
 #include "setup_screen_widget.h"  // a base class for screens in the setup assistant
 
 namespace moveit_setup_assistant
@@ -59,10 +55,10 @@ public:
   // Public Functions
   // ******************************************************************************************
 
-  AuthorInformationWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data);
+  AuthorInformationWidget(QWidget* parent, const MoveItConfigDataPtr& config_data);
 
   /// Received when this widget is chosen from the navigation menu
-  virtual void focusGiven();
+  void focusGiven() override;
 
   // ******************************************************************************************
   // Qt Components
@@ -77,8 +73,8 @@ private Q_SLOTS:
   // ******************************************************************************************
   // Slot Event Functions
   // ******************************************************************************************
-  void edited_name();
-  void edited_email();
+  void editedName();
+  void editedEmail();
 
 private:
   /// Contains all the configuration data for the setup assistant
@@ -86,5 +82,3 @@ private:
 };
 
 }  // namespace moveit_setup_assistant
-
-#endif

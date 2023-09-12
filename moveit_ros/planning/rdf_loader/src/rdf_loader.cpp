@@ -34,7 +34,7 @@
 
 /* Author: Ioan Sucan, Mathias Lüdtke, Dave Coleman */
 
-// MoveIt!
+// MoveIt
 #include <moveit/rdf_loader/rdf_loader.h>
 #include <moveit/profiler/profiler.h>
 
@@ -49,6 +49,11 @@
 #include <fstream>
 #include <streambuf>
 #include <algorithm>
+
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
 
 rdf_loader::RDFLoader::RDFLoader(const std::string& robot_description)
 {
@@ -65,13 +70,13 @@ rdf_loader::RDFLoader::RDFLoader(const std::string& robot_description)
     return;
   }
 
-  urdf::Model* umodel = new urdf::Model();
-  if (!umodel->initString(content))
+  std::unique_ptr<urdf::Model> urdf(new urdf::Model());
+  if (!urdf->initString(content))
   {
     ROS_ERROR_NAMED("rdf_loader", "Unable to parse URDF from parameter '%s'", robot_description_.c_str());
     return;
   }
-  urdf_.reset(umodel);
+  urdf_ = std::move(urdf);
 
   const std::string srdf_description(robot_description_ + "_semantic");
   std::string scontent;
@@ -82,13 +87,13 @@ rdf_loader::RDFLoader::RDFLoader(const std::string& robot_description)
     return;
   }
 
-  srdf_.reset(new srdf::Model());
-  if (!srdf_->initString(*urdf_, scontent))
+  srdf::ModelSharedPtr srdf(new srdf::Model());
+  if (!srdf->initString(*urdf_, scontent))
   {
     ROS_ERROR_NAMED("rdf_loader", "Unable to parse SRDF from parameter '%s'", srdf_description.c_str());
-    srdf_.reset();
     return;
   }
+  srdf_ = std::move(srdf);
 
   ROS_DEBUG_STREAM_NAMED("rdf", "Loaded robot model in " << (ros::WallTime::now() - start).toSec() << " seconds");
 }
@@ -98,44 +103,20 @@ rdf_loader::RDFLoader::RDFLoader(const std::string& urdf_string, const std::stri
   moveit::tools::Profiler::ScopedStart prof_start;
   moveit::tools::Profiler::ScopedBlock prof_block("RDFLoader(string)");
 
-  urdf::Model* umodel = new urdf::Model();
-  urdf_.reset(umodel);
+  auto umodel = std::make_unique<urdf::Model>();
   if (umodel->initString(urdf_string))
   {
-    srdf_.reset(new srdf::Model());
-    if (!srdf_->initString(*urdf_, srdf_string))
+    auto smodel = std::make_shared<srdf::Model>();
+    if (!smodel->initString(*umodel, srdf_string))
     {
       ROS_ERROR_NAMED("rdf_loader", "Unable to parse SRDF");
-      srdf_.reset();
     }
+    urdf_ = std::move(umodel);
+    srdf_ = std::move(smodel);
   }
   else
   {
     ROS_ERROR_NAMED("rdf_loader", "Unable to parse URDF");
-    urdf_.reset();
-  }
-}
-
-rdf_loader::RDFLoader::RDFLoader(TiXmlDocument* urdf_doc, TiXmlDocument* srdf_doc)
-{
-  moveit::tools::Profiler::ScopedStart prof_start;
-  moveit::tools::Profiler::ScopedBlock prof_block("RDFLoader(XML)");
-
-  urdf::Model* umodel = new urdf::Model();
-  urdf_.reset(umodel);
-  if (umodel->initXml(urdf_doc))
-  {
-    srdf_.reset(new srdf::Model());
-    if (!srdf_->initXml(*urdf_, srdf_doc))
-    {
-      ROS_ERROR_NAMED("rdf_loader", "Unable to parse SRDF");
-      srdf_.reset();
-    }
-  }
-  else
-  {
-    ROS_ERROR_NAMED("rdf_loader", "Unable to parse URDF");
-    urdf_.reset();
   }
 }
 
@@ -181,6 +162,7 @@ bool rdf_loader::RDFLoader::loadFileToString(std::string& buffer, const std::str
 bool rdf_loader::RDFLoader::loadXacroFileToString(std::string& buffer, const std::string& path,
                                                   const std::vector<std::string>& xacro_args)
 {
+  buffer.clear();
   if (path.empty())
   {
     ROS_ERROR_NAMED("rdf_loader", "Path is empty");
@@ -194,8 +176,8 @@ bool rdf_loader::RDFLoader::loadXacroFileToString(std::string& buffer, const std
   }
 
   std::string cmd = "rosrun xacro xacro ";
-  for (std::vector<std::string>::const_iterator it = xacro_args.begin(); it != xacro_args.end(); ++it)
-    cmd += *it + " ";
+  for (const std::string& xacro_arg : xacro_args)
+    cmd += xacro_arg + " ";
   cmd += path;
 
   FILE* pipe = popen(cmd.c_str(), "r");
@@ -208,7 +190,7 @@ bool rdf_loader::RDFLoader::loadXacroFileToString(std::string& buffer, const std
   char pipe_buffer[128];
   while (!feof(pipe))
   {
-    if (fgets(pipe_buffer, 128, pipe) != NULL)
+    if (fgets(pipe_buffer, 128, pipe) != nullptr)
       buffer += pipe_buffer;
   }
   pclose(pipe);

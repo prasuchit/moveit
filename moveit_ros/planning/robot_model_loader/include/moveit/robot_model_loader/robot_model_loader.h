@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_PLANNING_MODELS_LOADER_ROBOT_MODEL_LOADER_
-#define MOVEIT_PLANNING_MODELS_LOADER_ROBOT_MODEL_LOADER_
+#pragma once
 
 #include <moveit/macros/class_forward.h>
 #include <moveit/robot_model/robot_model.h>
@@ -44,9 +43,8 @@
 
 namespace robot_model_loader
 {
-MOVEIT_CLASS_FORWARD(RobotModelLoader);
+MOVEIT_CLASS_FORWARD(RobotModelLoader);  // Defines RobotModelLoaderPtr, ConstPtr, WeakPtr... etc
 
-/** @class RobotModelLoader */
 class RobotModelLoader
 {
 public:
@@ -54,21 +52,12 @@ public:
   struct Options
   {
     Options(const std::string& robot_description = "robot_description")
-      : robot_description_(robot_description), urdf_doc_(NULL), srdf_doc_(NULL), load_kinematics_solvers_(true)
+      : robot_description_(robot_description), load_kinematics_solvers_(true)
     {
     }
 
     Options(const std::string& urdf_string, const std::string& srdf_string)
-      : urdf_string_(urdf_string)
-      , srdf_string_(srdf_string)
-      , urdf_doc_(NULL)
-      , srdf_doc_(NULL)
-      , load_kinematics_solvers_(true)
-    {
-    }
-
-    Options(TiXmlDocument* urdf_doc, TiXmlDocument* srdf_doc)
-      : urdf_doc_(urdf_doc), srdf_doc_(srdf_doc), load_kinematics_solvers_(true)
+      : urdf_string_(urdf_string), srdf_string_(srdf_string), load_kinematics_solvers_(true)
     {
     }
 
@@ -80,9 +69,6 @@ public:
     /** @brief The string content of the URDF and SRDF documents. Loading from string is attempted only if loading from
      * XML fails */
     std::string urdf_string_, srdf_string_;
-
-    /** @brief The parsed XML content of the URDF and SRDF documents. */
-    TiXmlDocument *urdf_doc_, *srdf_doc_;
 
     /** @brief Flag indicating whether the kinematics solvers should be loaded as well, using specified ROS parameters
      */
@@ -97,7 +83,7 @@ public:
   ~RobotModelLoader();
 
   /** @brief Get the constructed planning_models::RobotModel */
-  const robot_model::RobotModelPtr& getModel() const
+  const moveit::core::RobotModelPtr& getModel() const
   {
     return model_;
   }
@@ -141,9 +127,8 @@ public:
 private:
   void configure(const Options& opt);
 
-  robot_model::RobotModelPtr model_;
+  moveit::core::RobotModelPtr model_;
   rdf_loader::RDFLoaderPtr rdf_loader_;
   kinematics_plugin_loader::KinematicsPluginLoaderPtr kinematics_loader_;
 };
-}
-#endif
+}  // namespace robot_model_loader

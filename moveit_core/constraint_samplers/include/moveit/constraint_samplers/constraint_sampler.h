@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_CONSTRAINT_SAMPLERS_CONSTRAINT_SAMPLER_
-#define MOVEIT_CONSTRAINT_SAMPLERS_CONSTRAINT_SAMPLER_
+#pragma once
 
 #include <moveit/planning_scene/planning_scene.h>
 #include <moveit/kinematic_constraints/kinematic_constraint.h>
@@ -51,7 +50,7 @@
  */
 namespace constraint_samplers
 {
-MOVEIT_CLASS_FORWARD(ConstraintSampler);
+MOVEIT_CLASS_FORWARD(ConstraintSampler);  // Defines ConstraintSamplerPtr, ConstPtr, WeakPtr... etc
 
 /**
  * \brief ConstraintSampler is an abstract base class that allows the
@@ -105,7 +104,7 @@ public:
    *
    * @return The joint model group
    */
-  const robot_model::JointModelGroup* getJointModelGroup() const
+  const moveit::core::JointModelGroup* getJointModelGroup() const
   {
     return jmg_;
   }
@@ -141,7 +140,7 @@ public:
    * \brief Gets the callback used to determine state validity during sampling. The sampler will attempt
    *        to satisfy this constraint if possible, but there is no guarantee.
    */
-  const robot_state::GroupStateValidityCallbackFn& getGroupStateValidityCallback() const
+  const moveit::core::GroupStateValidityCallbackFn& getGroupStateValidityCallback() const
   {
     return group_state_validity_callback_;
   }
@@ -152,7 +151,7 @@ public:
    *
    * @param callback The callback to set
    */
-  void setGroupStateValidityCallback(const robot_state::GroupStateValidityCallbackFn& callback)
+  void setGroupStateValidityCallback(const moveit::core::GroupStateValidityCallbackFn& callback)
   {
     group_state_validity_callback_ = callback;
   }
@@ -167,7 +166,7 @@ public:
    *
    * @return True if a sample was successfully taken, false otherwise
    */
-  bool sample(robot_state::RobotState& state)
+  bool sample(moveit::core::RobotState& state)
   {
     return sample(state, state, DEFAULT_MAX_SAMPLING_ATTEMPTS);
   }
@@ -183,7 +182,7 @@ public:
    *
    * @return True if a sample was successfully taken, false otherwise
    */
-  bool sample(robot_state::RobotState& state, unsigned int max_attempts)
+  bool sample(moveit::core::RobotState& state, unsigned int max_attempts)
   {
     return sample(state, state, max_attempts);
   }
@@ -198,24 +197,9 @@ public:
    *
    * @return True if a sample was successfully taken, false otherwise
    */
-  bool sample(robot_state::RobotState& state, const robot_state::RobotState& reference_state)
+  bool sample(moveit::core::RobotState& state, const moveit::core::RobotState& reference_state)
   {
     return sample(state, reference_state, DEFAULT_MAX_SAMPLING_ATTEMPTS);
-  }
-
-  /**
-   * \brief Project a sample given the constraints, updating the joint state
-   * group. The value DEFAULT_MAX_SAMPLING_ATTEMPTS will be passed in
-   * as the maximum number of attempts to make to project the sample.
-   *
-   * @param state The state which specifies the state to be projected, according to the constraints. Only values for
-   *        the group are written. The same state is used as reference if needed.
-   *
-   * @return True if a sample was successfully projected, false otherwise
-   */
-  bool project(robot_state::RobotState& state)
-  {
-    return project(state, DEFAULT_MAX_SAMPLING_ATTEMPTS);
   }
 
   /**
@@ -229,21 +213,8 @@ public:
    *
    * @return True if a sample was successfully taken, false otherwise
    */
-  virtual bool sample(robot_state::RobotState& state, const robot_state::RobotState& reference_state,
+  virtual bool sample(moveit::core::RobotState& state, const moveit::core::RobotState& reference_state,
                       unsigned int max_attempts) = 0;
-
-  /**
-   * \brief Project a sample given the constraints, updating the joint state
-   * group. This function allows the parameter max_attempts to be set.
-   *
-   * @param [out] state The state into which the values will be placed. Only values for the group are written.
-   * @param [in] max_attempts The maximum number of times to attempt to draw a sample.  If no sample has been drawn in
-   *this
-   *        number of attempts, false will be returned.
-   *
-   * @return True if a sample was successfully projected, false otherwise
-   */
-  virtual bool project(robot_state::RobotState& state, unsigned int max_attempts) = 0;
 
   /**
    * \brief Returns whether or not the constraint sampler is valid or not.
@@ -283,16 +254,16 @@ protected:
    */
   virtual void clear();
 
-  bool is_valid_; /**< \brief  Holds the value for validity */
+  bool is_valid_;  ///< Holds the value for validity
 
-  planning_scene::PlanningSceneConstPtr scene_; /**< \brief Holds the planning scene */
-  const robot_model::JointModelGroup* jmg_; /**< \brief Holds the joint model group associated with this constraint */
-  /** \brief Holds the set of frames that must exist in the reference state to allow samples to be drawn */
+  /// Holds the planning scene
+  planning_scene::PlanningSceneConstPtr scene_;
+  /// Holds the joint model group associated with this constraint
+  const moveit::core::JointModelGroup* const jmg_;
+  /// Holds the set of frames that must exist in the reference state to allow samples to be drawn
   std::vector<std::string> frame_depends_;
-  robot_state::GroupStateValidityCallbackFn group_state_validity_callback_; /**< \brief Holds the callback for state
-                                                                               validity */
-  bool verbose_;                                                            /**< \brief True if verbosity is on */
+  /// Holds the callback for state validity
+  moveit::core::GroupStateValidityCallbackFn group_state_validity_callback_;
+  bool verbose_;  ///< True if verbosity is on
 };
-}
-
-#endif
+}  // namespace constraint_samplers

@@ -34,8 +34,7 @@
 
 /** \author E. Gil Jones */
 
-#ifndef COLLISION_DISTANCE_FIELD_HELPERS_H_
-#define COLLISION_DISTANCE_FIELD_HELPERS_H_
+#pragma once
 
 #include <ros/ros.h>
 #include <planning_models/robot_model.h>
@@ -44,7 +43,7 @@
 namespace collision_detection
 {
 static inline bool loadLinkBodySphereDecompositions(
-    ros::NodeHandle& nh, const planning_models::RobotModelConstPtr& kmodel,
+    ros::NodeHandle& nh, const planning_models::RobotModelConstPtr& robot_model,
     std::map<std::string, std::vector<collision_detection::CollisionSphere> >& link_body_spheres)
 {
   if (!nh.hasParam("link_spheres"))
@@ -125,5 +124,4 @@ static inline bool loadLinkBodySphereDecompositions(
   }
   return true;
 }
-}
-#endif
+}  // namespace collision_detection

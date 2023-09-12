@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef TEST_MOVEIT_CONTROLLER_MANAGER_
-#define TEST_MOVEIT_CONTROLLER_MANAGER_
+#pragma once
 
 #include <moveit/controller_manager/controller_manager.h>
 
@@ -48,22 +47,23 @@ public:
   {
   }
 
-  virtual bool sendTrajectory(const moveit_msgs::RobotTrajectory& trajectory)
+  bool sendTrajectory(const moveit_msgs::RobotTrajectory& /*trajectory*/) override
   {
     return true;
   }
 
-  virtual bool cancelExecution()
+  bool cancelExecution() override
   {
     return true;
   }
 
-  virtual bool waitForExecution(const ros::Duration& timeout = ros::Duration(0))
+  bool waitForExecution(const ros::Duration& timeout = ros::Duration(0)) override
   {
+    (void)timeout;
     return false;
   }
 
-  virtual moveit_controller_manager::ExecutionStatus getLastExecutionStatus()
+  moveit_controller_manager::ExecutionStatus getLastExecutionStatus() override
   {
     return moveit_controller_manager::ExecutionStatus::SUCCEEDED;
   }
@@ -106,19 +106,19 @@ public:
                                                controller_joints_["head"].begin(), controller_joints_["head"].end());
   }
 
-  virtual moveit_controller_manager::MoveItControllerHandlePtr getControllerHandle(const std::string& name)
+  moveit_controller_manager::MoveItControllerHandlePtr getControllerHandle(const std::string& name) override
   {
     return moveit_controller_manager::MoveItControllerHandlePtr(new TestMoveItControllerHandle(name));
   }
 
-  virtual void getControllersList(std::vector<std::string>& names)
+  void getControllersList(std::vector<std::string>& names) override
   {
     names.clear();
     for (std::map<std::string, int>::const_iterator it = controllers_.begin(); it != controllers_.end(); ++it)
       names.push_back(it->first);
   }
 
-  virtual void getActiveControllers(std::vector<std::string>& names)
+  void getActiveControllers(std::vector<std::string>& names) override
   {
     names.clear();
     for (std::map<std::string, int>::const_iterator it = controllers_.begin(); it != controllers_.end(); ++it)
@@ -126,13 +126,13 @@ public:
         names.push_back(it->first);
   }
 
-  virtual void getControllerJoints(const std::string& name, std::vector<std::string>& joints)
+  void getControllerJoints(const std::string& name, std::vector<std::string>& joints) override
   {
     joints = controller_joints_[name];
   }
 
-  virtual moveit_controller_manager::MoveItControllerManager::ControllerState
-  getControllerState(const std::string& name)
+  moveit_controller_manager::MoveItControllerManager::ControllerState
+  getControllerState(const std::string& name) override
   {
     moveit_controller_manager::MoveItControllerManager::ControllerState state;
     state.active_ = controllers_[name] & ACTIVE;
@@ -140,17 +140,17 @@ public:
     return state;
   }
 
-  virtual bool switchControllers(const std::vector<std::string>& activate, const std::vector<std::string>& deactivate)
+  bool switchControllers(const std::vector<std::string>& activate, const std::vector<std::string>& deactivate) override
   {
-    for (std::size_t i = 0; i < deactivate.size(); ++i)
+    for (const std::string& controller : deactivate)
     {
-      controllers_[deactivate[i]] &= ~ACTIVE;
-      std::cout << "Deactivated controller " << deactivate[i] << std::endl;
+      controllers_[controller] &= ~ACTIVE;
+      std::cout << "Deactivated controller " << controller << std::endl;
     }
-    for (std::size_t i = 0; i < activate.size(); ++i)
+    for (const std::string& controller : activate)
     {
-      controllers_[activate[i]] |= ACTIVE;
-      std::cout << "Activated controller " << activate[i] << std::endl;
+      controllers_[controller] |= ACTIVE;
+      std::cout << "Activated controller " << controller << std::endl;
     }
     return true;
   }
@@ -159,5 +159,4 @@ protected:
   std::map<std::string, int> controllers_;
   std::map<std::string, std::vector<std::string> > controller_joints_;
 };
-}
-#endif
+}  // namespace test_moveit_controller_manager

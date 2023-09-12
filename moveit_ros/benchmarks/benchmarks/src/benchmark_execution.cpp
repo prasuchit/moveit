@@ -51,7 +51,7 @@
 #include <boost/progress.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
@@ -88,8 +88,8 @@ void checkHeader(moveit_msgs::Constraints& c, const std::string& header_frame)
       c.orientation_constraints[i].header.stamp = ros::Time::now();
     }
 }
-}
-}
+}  // namespace
+}  // namespace moveit_benchmarks
 
 moveit_benchmarks::BenchmarkExecution::BenchmarkExecution(const planning_scene::PlanningScenePtr& scene,
                                                           warehouse_ros::DatabaseConnection::Ptr conn)
@@ -98,8 +98,8 @@ moveit_benchmarks::BenchmarkExecution::BenchmarkExecution(const planning_scene::
   // load the pluginlib class loader
   try
   {
-    planner_plugin_loader_.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>(
-        "moveit_core", "planning_interface::PlannerManager"));
+    planner_plugin_loader_ = std::make_shared<pluginlib::ClassLoader<planning_interface::PlannerManager>>(
+        "moveit_core", "planning_interface::PlannerManager");
   }
   catch (pluginlib::PluginlibException& ex)
   {
@@ -274,7 +274,7 @@ void moveit_benchmarks::BenchmarkExecution::runAllBenchmarks(BenchmarkType type)
 
       if (got_robot_state)
       {
-        start_state_to_use.reset(new moveit_msgs::RobotState(*robot_state));
+        start_state_to_use = std::make_shared<moveit_msgs::RobotState(*robot_state));
         ROS_INFO("Loaded start state '%s'", state_name.c_str());
       }
       else
@@ -373,17 +373,17 @@ void moveit_benchmarks::BenchmarkExecution::runAllBenchmarks(BenchmarkType type)
             geometry_msgs::Pose wMc_msg;
             wMc_msg.position = constr->position_constraints[0].constraint_region.primitive_poses[0].position;
             wMc_msg.orientation = constr->orientation_constraints[0].orientation;
-            Eigen::Affine3d wMc;
-            tf::poseMsgToEigen(wMc_msg, wMc);
+            Eigen::Isometry3d wMc;
+            tf2::fromMsg(wMc_msg, wMc);
 
-            Eigen::Affine3d offset_tf(Eigen::AngleAxis<double>(options_.offsets[3], Eigen::Vector3d::UnitX()) *
-                                      Eigen::AngleAxis<double>(options_.offsets[4], Eigen::Vector3d::UnitY()) *
-                                      Eigen::AngleAxis<double>(options_.offsets[5], Eigen::Vector3d::UnitZ()));
+            Eigen::Isometry3d offset_tf(Eigen::AngleAxis<double>(options_.offsets[3], Eigen::Vector3d::UnitX()) *
+                                        Eigen::AngleAxis<double>(options_.offsets[4], Eigen::Vector3d::UnitY()) *
+                                        Eigen::AngleAxis<double>(options_.offsets[5], Eigen::Vector3d::UnitZ()));
             offset_tf.translation() = Eigen::Vector3d(options_.offsets[0], options_.offsets[1], options_.offsets[2]);
 
-            Eigen::Affine3d wMnc = wMc * offset_tf;
+            Eigen::Isometry3d wMnc = wMc * offset_tf;
             geometry_msgs::Pose wMnc_msg;
-            tf::poseEigenToMsg(wMnc, wMnc_msg);
+            wMnc_msg = tf2::toMsg(wMnc);
 
             req.motion_plan_request.goal_constraints[0]
                 .position_constraints[0]
@@ -442,9 +442,9 @@ void moveit_benchmarks::BenchmarkExecution::runAllBenchmarks(BenchmarkType type)
           // set the workspace bounds
           req.motion_plan_request.workspace_parameters = options_.workspace_parameters;
 
-          Eigen::Affine3d offset_tf(Eigen::AngleAxis<double>(options_.offsets[3], Eigen::Vector3d::UnitX()) *
-                                    Eigen::AngleAxis<double>(options_.offsets[4], Eigen::Vector3d::UnitY()) *
-                                    Eigen::AngleAxis<double>(options_.offsets[5], Eigen::Vector3d::UnitZ()));
+          Eigen::Isometry3d offset_tf(Eigen::AngleAxis<double>(options_.offsets[3], Eigen::Vector3d::UnitX()) *
+                                      Eigen::AngleAxis<double>(options_.offsets[4], Eigen::Vector3d::UnitY()) *
+                                      Eigen::AngleAxis<double>(options_.offsets[5], Eigen::Vector3d::UnitZ()));
           offset_tf.translation() = Eigen::Vector3d(options_.offsets[0], options_.offsets[1], options_.offsets[2]);
 
           // Apply waypoint offsets, check fields
@@ -464,12 +464,11 @@ void moveit_benchmarks::BenchmarkExecution::runAllBenchmarks(BenchmarkType type)
                                      .position;
               wMc_msg.orientation =
                   req.motion_plan_request.trajectory_constraints.constraints[tc].orientation_constraints[0].orientation;
-              Eigen::Affine3d wMc;
-              tf::poseMsgToEigen(wMc_msg, wMc);
+              Eigen::Isometry3d wMc;
+              tf2::fromMsg(wMc_msg, wMc);
 
-              Eigen::Affine3d wMnc = wMc * offset_tf;
-              geometry_msgs::Pose wMnc_msg;
-              tf::poseEigenToMsg(wMnc, wMnc_msg);
+              Eigen::Isometry3d wMnc = wMc * offset_tf;
+              geometry_msgs::Pose wMnc_msg = tf2::toMsg(wMnc);
 
               req.motion_plan_request.trajectory_constraints.constraints[tc]
                   .position_constraints[0]
@@ -514,38 +513,29 @@ bool moveit_benchmarks::BenchmarkExecution::readOptions(const std::string& filen
   try
   {
     boost::program_options::options_description desc;
-    desc.add_options()("scene.name", boost::program_options::value<std::string>(), "Scene name")(
-        "scene.runs", boost::program_options::value<std::string>()->default_value("1"), "Number of runs")(
-        "scene.timeout", boost::program_options::value<std::string>()->default_value(""),
-        "Timeout for planning (s)")("scene.start", boost::program_options::value<std::string>()->default_value(""),
-                                    "Regex for the start states to use")(
-        "scene.query", boost::program_options::value<std::string>()->default_value(".*"),
-        "Regex for the queries to execute")("scene.goal",
-                                            boost::program_options::value<std::string>()->default_value(""),
-                                            "Regex for the names of constraints to use as goals")(
-        "scene.trajectory", boost::program_options::value<std::string>()->default_value(""),
-        "Regex for the names of constraints to use as trajectories")(
-        "scene.group", boost::program_options::value<std::string>()->default_value(""),
-        "Override the group to plan for")("scene.planning_frame",
-                                          boost::program_options::value<std::string>()->default_value(""),
-                                          "Override the planning frame to use")(
-        "scene.default_constrained_link", boost::program_options::value<std::string>()->default_value(""),
-        "Specify the default link to consider as constrained when one is not specified in a moveit_msgs::Constraints "
-        "message")("scene.goal_offset_x", boost::program_options::value<std::string>()->default_value("0.0"),
-                   "Goal offset in x")(
-        "scene.goal_offset_y", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in y")(
-        "scene.goal_offset_z", boost::program_options::value<std::string>()->default_value("0.0"),
-        "Goal offset in z")("scene.goal_offset_roll",
-                            boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in roll")(
-        "scene.goal_offset_pitch", boost::program_options::value<std::string>()->default_value("0.0"),
-        "Goal offset in pitch")("scene.goal_offset_yaw",
-                                boost::program_options::value<std::string>()->default_value("0.0"),
-                                "Goal offset in yaw")("scene.output", boost::program_options::value<std::string>(),
-                                                      "Location of benchmark log file")(
-        "scene.workspace", boost::program_options::value<std::string>(), "Bounding box of workspace to plan in - "
-                                                                         "min_x, min_y, min_z, max_x, max_y, max_z")(
-        "scene.workspace_frame", boost::program_options::value<std::string>(), "Frame id of bounding box of workspace "
-                                                                               "to plan in");
+    // clang-format off
+    desc.add_options()
+      ("scene.name", boost::program_options::value<std::string>(), "Scene name")
+      ("scene.runs", boost::program_options::value<std::string>()->default_value("1"), "Number of runs")
+      ("scene.timeout", boost::program_options::value<std::string>()->default_value(""), "Timeout for planning (s)")
+      ("scene.start", boost::program_options::value<std::string>()->default_value(""), "Regex for the start states to use")
+      ("scene.query", boost::program_options::value<std::string>()->default_value(".*"), "Regex for the queries to execute")
+      ("scene.goal", boost::program_options::value<std::string>()->default_value(""), "Regex for the names of constraints to use as goals")
+      ("scene.trajectory", boost::program_options::value<std::string>()->default_value(""), "Regex for the names of constraints to use as trajectories")
+      ("scene.group", boost::program_options::value<std::string>()->default_value(""), "Override the group to plan for")
+      ("scene.planning_frame", boost::program_options::value<std::string>()->default_value(""), "Override the planning frame to use")
+      ("scene.default_constrained_link", boost::program_options::value<std::string>()->default_value(""),
+       "Specify the default link to consider as constrained when one is not specified in a moveit_msgs::Constraints message")
+      ("scene.goal_offset_x", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in x")
+      ("scene.goal_offset_y", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in y")
+      ("scene.goal_offset_z", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in z")
+      ("scene.goal_offset_roll", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in roll")
+      ("scene.goal_offset_pitch", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in pitch")
+      ("scene.goal_offset_yaw", boost::program_options::value<std::string>()->default_value("0.0"), "Goal offset in yaw")
+      ("scene.output", boost::program_options::value<std::string>(), "Location of benchmark log file")
+      ("scene.workspace", boost::program_options::value<std::string>(), "Bounding box of workspace to plan in - min_x, min_y, min_z, max_x, max_y, max_z")
+      ("scene.workspace_frame", boost::program_options::value<std::string>(), "Frame id of bounding box of workspace to plan in");
+    // clang-format on
 
     boost::program_options::variables_map vm;
     boost::program_options::parsed_options po = boost::program_options::parse_config_file(cfg, desc, true);
@@ -675,7 +665,7 @@ bool moveit_benchmarks::BenchmarkExecution::readOptions(const std::string& filen
         {
           if (bpo)
             options_.plugins.push_back(*bpo);
-          bpo.reset(new PlanningPluginOptions());
+          bpo = std::make_shared<PlanningPluginOptions());
           bpo->name = val;
           bpo->runs = default_run_count;
         }
@@ -893,18 +883,18 @@ void moveit_benchmarks::BenchmarkExecution::collectMetrics(RunData& rundata,
 
 namespace
 {
-bool isIKSolutionCollisionFree(const planning_scene::PlanningScene* scene, robot_state::RobotState* state,
-                               const robot_model::JointModelGroup* group, const double* ik_solution, bool* reachable)
+bool isIKSolutionCollisionFree(const planning_scene::PlanningScene& scene, moveit::core::RobotState& state,
+                               const moveit::core::JointModelGroup* group, const double* ik_solution, bool& reachable)
 {
-  state->setJointGroupPositions(group, ik_solution);
-  state->update();
-  *reachable = true;
-  if (scene->isStateColliding(*state, group->getName(), false))
+  state.setJointGroupPositions(group, ik_solution);
+  state.update();
+  reachable = true;
+  if (scene.isStateColliding(state, group->getName(), false))
     return false;
   else
     return true;
 }
-}
+}  // namespace
 
 void moveit_benchmarks::BenchmarkExecution::runPlanningBenchmark(BenchmarkRequest& req)
 {
@@ -1011,8 +1001,9 @@ void moveit_benchmarks::BenchmarkExecution::runPlanningBenchmark(BenchmarkReques
         ROS_ERROR("Planning interface '%s' has no planners defined", it->first.c_str());
     }
     else
-      ROS_WARN_STREAM("Planning interface '" << it->second->getDescription() << "' is not able to solve the specified "
-                                                                                "benchmark problem.");
+      ROS_WARN_STREAM("Planning interface '" << it->second->getDescription()
+                                             << "' is not able to solve the specified "
+                                                "benchmark problem.");
   }
 
   // error check
@@ -1257,8 +1248,7 @@ void moveit_benchmarks::BenchmarkExecution::runGoalExistenceBenchmark(BenchmarkR
   bool reachable = false;
   if (req.motion_plan_request.goal_constraints.size() > 0 &&
       req.motion_plan_request.goal_constraints[0].position_constraints.size() > 0 &&
-      req.motion_plan_request.goal_constraints[0].position_constraints[0].constraint_region.primitive_poses.size() >
-          0 &&
+      req.motion_plan_request.goal_constraints[0].position_constraints[0].constraint_region.primitive_poses.size() > 0 &&
       req.motion_plan_request.goal_constraints[0].orientation_constraints.size() > 0)
   {
     // Compute IK on goal constraints
@@ -1280,8 +1270,8 @@ void moveit_benchmarks::BenchmarkExecution::runGoalExistenceBenchmark(BenchmarkR
     ik_pose.orientation.z = req.motion_plan_request.goal_constraints[0].orientation_constraints[0].orientation.z;
     ik_pose.orientation.w = req.motion_plan_request.goal_constraints[0].orientation_constraints[0].orientation.w;
 
-    robot_state::RobotState robot_state(planning_scene_->getCurrentState());
-    robot_state::robotStateMsgToRobotState(req.motion_plan_request.start_state, robot_state);
+    moveit::core::RobotState robot_state(planning_scene_->getCurrentState());
+    moveit::core::robotStateMsgToRobotState(req.motion_plan_request.start_state, robot_state);
 
     // Compute IK
     ROS_INFO_STREAM("Processing goal " << req.motion_plan_request.goal_constraints[0].name << " ...");
@@ -1289,7 +1279,10 @@ void moveit_benchmarks::BenchmarkExecution::runGoalExistenceBenchmark(BenchmarkR
     success = robot_state.setFromIK(
         robot_state.getJointModelGroup(req.motion_plan_request.group_name), ik_pose,
         req.motion_plan_request.num_planning_attempts, req.motion_plan_request.allowed_planning_time,
-        boost::bind(&isIKSolutionCollisionFree, planning_scene_.get(), _1, _2, _3, &reachable));
+        [&scene = *planning_scene, &reachable](moveit::core::RobotState* state,
+                                               const moveit::core::JointModelGroup* jmg, const double* ik_solution) {
+          return isIKSolutionCollisionFree(scene, *state, jmg, ik_solution, reachable);
+        });
     if (success)
     {
       ROS_INFO("  Success!");
@@ -1368,8 +1361,8 @@ void moveit_benchmarks::BenchmarkExecution::runGoalExistenceBenchmark(BenchmarkR
       ik_pose.orientation.w =
           req.motion_plan_request.trajectory_constraints.constraints[tc].orientation_constraints[0].orientation.w;
 
-      robot_state::RobotState robot_state(planning_scene_->getCurrentState());
-      robot_state::robotStateMsgToRobotState(req.motion_plan_request.start_state, robot_state);
+      moveit::core::RobotState robot_state(planning_scene_->getCurrentState());
+      moveit::core::robotStateMsgToRobotState(req.motion_plan_request.start_state, robot_state);
 
       // Compute IK
       ROS_INFO_STREAM("Processing trajectory waypoint "
@@ -1378,7 +1371,11 @@ void moveit_benchmarks::BenchmarkExecution::runGoalExistenceBenchmark(BenchmarkR
       success = robot_state.setFromIK(
           robot_state.getJointModelGroup(req.motion_plan_request.group_name), ik_pose,
           req.motion_plan_request.num_planning_attempts, req.motion_plan_request.allowed_planning_time,
-          boost::bind(&isIKSolutionCollisionFree, planning_scene_.get(), _1, _2, _3, &reachable));
+          [&scene = *planning_scene, &reachable](moveit::core::RobotState* state,
+                                                 const moveit::core::JointModelGroup* jmg, const double* ik_solution) {
+            return isIKSolutionCollisionFree(scene, *state, jmg, ik_solution, reachable);
+          });
+
       double duration = (ros::WallTime::now() - startTime).toSec();
 
       if (success)

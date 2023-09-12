@@ -34,8 +34,7 @@
 
 /* Author: Ioan Sucan */
 
-#ifndef MOVEIT_PROFILER_
-#define MOVEIT_PROFILER_
+#pragma once
 
 #define MOVEIT_ENABLE_PROFILING 1
 
@@ -79,12 +78,12 @@ public:
   {
   public:
     /** \brief Start counting time for the block named \e name of the profiler \e prof */
-    ScopedBlock(const std::string& name, Profiler& prof = Profiler::Instance()) : name_(name), prof_(prof)
+    ScopedBlock(const std::string& name, Profiler& prof = Profiler::instance()) : name_(name), prof_(prof)
     {
       prof_.begin(name);
     }
 
-    ~ScopedBlock(void)
+    ~ScopedBlock()
     {
       prof_.end(name_);
     }
@@ -100,13 +99,13 @@ public:
   {
   public:
     /** \brief Take as argument the profiler instance to operate on (\e prof) */
-    ScopedStart(Profiler& prof = Profiler::Instance()) : prof_(prof), wasRunning_(prof_.running())
+    ScopedStart(Profiler& prof = Profiler::instance()) : prof_(prof), wasRunning_(prof_.running())
     {
       if (!wasRunning_)
         prof_.start();
     }
 
-    ~ScopedStart(void)
+    ~ScopedStart()
     {
       if (!wasRunning_)
         prof_.stop();
@@ -118,7 +117,7 @@ public:
   };
 
   /** \brief Return an instance of the class */
-  static Profiler& Instance(void);
+  static Profiler& instance();
 
   /** \brief Constructor. It is allowed to separately instantiate this
       class (not only as a singleton) */
@@ -129,67 +128,67 @@ public:
   }
 
   /** \brief Destructor */
-  ~Profiler(void)
+  ~Profiler()
   {
     if (printOnDestroy_ && !data_.empty())
       status();
   }
 
   /** \brief Start counting time */
-  static void Start(void)
+  static void Start()  // NOLINT(readability-identifier-naming)
   {
-    Instance().start();
+    instance().start();
   }
 
   /** \brief Stop counting time */
-  static void Stop(void)
+  static void Stop()  // NOLINT(readability-identifier-naming)
   {
-    Instance().stop();
+    instance().stop();
   }
 
   /** \brief Clear counted time and events */
-  static void Clear(void)
+  static void Clear()  // NOLINT(readability-identifier-naming)
   {
-    Instance().clear();
+    instance().clear();
   }
 
   /** \brief Start counting time */
-  void start(void);
+  void start();
 
   /** \brief Stop counting time */
-  void stop(void);
+  void stop();
 
   /** \brief Clear counted time and events */
-  void clear(void);
+  void clear();
 
   /** \brief Count a specific event for a number of times */
-  static void Event(const std::string& name, const unsigned int times = 1)
+  static void Event(const std::string& name, const unsigned int times = 1)  // NOLINT(readability-identifier-naming)
   {
-    Instance().event(name, times);
+    instance().event(name, times);
   }
 
   /** \brief Count a specific event for a number of times */
   void event(const std::string& name, const unsigned int times = 1);
 
   /** \brief Maintain the average of a specific value */
-  static void Average(const std::string& name, const double value)
+  static void Average(const std::string& name, const double value)  // NOLINT(readability-identifier-naming)
   {
-    Instance().average(name, value);
+    instance().average(name, value);
   }
 
   /** \brief Maintain the average of a specific value */
   void average(const std::string& name, const double value);
 
   /** \brief Begin counting time for a specific chunk of code */
-  static void Begin(const std::string& name)
+  static void Begin(const std::string& name)  // NOLINT(readability-identifier-naming)
   {
-    Instance().begin(name);
+    instance().begin(name);
   }
 
   /** \brief Stop counting time for a specific chunk of code */
-  static void End(const std::string& name)
+  static void End(const std::string& name)  // NOLINT(readability-identifier-naming)
   {
-    Instance().end(name);
+    instance().end(name);
   }
 
   /** \brief Begin counting time for a specific chunk of code */
@@ -201,9 +200,9 @@ public:
   /** \brief Print the status of the profiled code chunks and
       events. Optionally, computation done by different threads
       can be printed separately. */
-  static void Status(std::ostream& out = std::cout, bool merge = true)
+  static void Status(std::ostream& out = std::cout, bool merge = true)  // NOLINT(readability-identifier-naming)
   {
-    Instance().status(out, merge);
+    instance().status(out, merge);
   }
 
   /** \brief Print the status of the profiled code chunks and
@@ -213,32 +212,32 @@ public:
 
   /** \brief Print the status of the profiled code chunks and
       events to the console (using msg::Console) */
-  static void Console(void)
+  static void Console()  // NOLINT(readability-identifier-naming)
   {
-    Instance().console();
+    instance().console();
   }
 
   /** \brief Print the status of the profiled code chunks and
       events to the console (using msg::Console) */
-  void console(void);
+  void console();
 
   /** \brief Check if the profiler is counting time or not */
-  bool running(void) const
+  bool running() const
   {
     return running_;
   }
 
   /** \brief Check if the profiler is counting time or not */
-  static bool Running(void)
+  static bool Running()  // NOLINT(readability-identifier-naming)
   {
-    return Instance().running();
+    return instance().running();
   }
 
 private:
   /** \brief Information about time spent in a section of the code */
   struct TimeInfo
   {
-    TimeInfo(void)
+    TimeInfo()
       : total(0, 0, 0, 0), shortest(boost::posix_time::pos_infin), longest(boost::posix_time::neg_infin), parts(0)
     {
     }
@@ -259,13 +258,13 @@ private:
     boost::posix_time::ptime start;
 
     /** \brief Begin counting time */
-    void set(void)
+    void set()
     {
       start = boost::posix_time::microsec_clock::universal_time();
     }
 
     /** \brief Add the counted time to the total time */
-    void update(void)
+    void update()
     {
       const boost::posix_time::time_duration& dt = boost::posix_time::microsec_clock::universal_time() - start;
       if (dt > longest)
@@ -311,8 +310,8 @@ private:
   bool running_;
   bool printOnDestroy_;
 };
-}
-}
+}  // namespace tools
+}  // namespace moveit
 
 #else
 
@@ -331,7 +330,7 @@ public:
   class ScopedBlock
   {
   public:
-    ScopedBlock(const std::string&, Profiler& = Profiler::Instance())
+    ScopedBlock(const std::string&, Profiler& = Profiler::instance())
     {
     }
 
@@ -343,7 +342,7 @@ public:
   class ScopedStart
   {
   public:
-    ScopedStart(Profiler& = Profiler::Instance())
+    ScopedStart(Profiler& = Profiler::instance())
     {
     }
 
@@ -352,7 +351,7 @@ public:
     }
   };
 
-  static Profiler& Instance(void);
+  static Profiler& instance(void);
 
   Profiler(bool = true, bool = true)
   {
@@ -444,9 +443,7 @@ public:
     return false;
   }
 };
-}
-}
-
-#endif
+}  // namespace tools
+}  // namespace moveit
 
 #endif

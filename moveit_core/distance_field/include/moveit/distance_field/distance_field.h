@@ -34,14 +34,10 @@
 
 /* Author: Mrinal Kalakrishnan, Ken Anderson, E. Gil Jones */
 
-#ifndef MOVEIT_DISTANCE_FIELD_DISTANCE_FIELD_H
-#define MOVEIT_DISTANCE_FIELD_DISTANCE_FIELD_H
+#pragma once
 
 #include <moveit/macros/class_forward.h>
-#include <moveit/macros/deprecation.h>
 #include <moveit/distance_field/voxel_grid.h>
-#include <vector>
-#include <list>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <Eigen/Core>
@@ -51,7 +47,7 @@
 
 namespace shapes
 {
-MOVEIT_CLASS_FORWARD(Shape);
+MOVEIT_CLASS_FORWARD(Shape);  // Defines ShapePtr, ConstPtr, WeakPtr... etc
 }
 namespace octomap
 {
@@ -70,28 +66,28 @@ namespace distance_field
 /// \brief The plane to visualize
 enum PlaneVisualizationType
 {
-  XYPlane,
-  XZPlane,
-  YZPlane
+  XY_PLANE,
+  XZ_PLANE,
+  YZ_PLANE
 };
 
-MOVEIT_CLASS_FORWARD(DistanceField);
+MOVEIT_CLASS_FORWARD(DistanceField);  // Defines DistanceFieldPtr, ConstPtr, WeakPtr... etc
 
 /**
-* \brief DistanceField is an abstract base class for computing
-* distances from sets of 3D obstacle points.  The distance assigned to
-* a freespace cell should be the distance to the closest obstacle
-* cell.  Cells that are obstacle cells should either be marked as zero
-* distance, or may have a negative distance if a signed version of the
-* distance field is being used and an obstacle point is internal to an
-* obstacle volume.
-*
-* Inherited classes must contain methods for holding a dense set of 3D
-* voxels as well as methods for computing the required distances.  The
-* distance field parent class doesn't hold the data or have any way to
-* generate distances from that data.
-*
-*/
+ * \brief DistanceField is an abstract base class for computing
+ * distances from sets of 3D obstacle points.  The distance assigned to
+ * a freespace cell should be the distance to the closest obstacle
+ * cell.  Cells that are obstacle cells should either be marked as zero
+ * distance, or may have a negative distance if a signed version of the
+ * distance field is being used and an obstacle point is internal to an
+ * obstacle volume.
+ *
+ * Inherited classes must contain methods for holding a dense set of 3D
+ * voxels as well as methods for computing the required distances.  The
+ * distance field parent class doesn't hold the data or have any way to
+ * generate distances from that data.
+ *
+ */
 class DistanceField
 {
 public:
@@ -169,7 +165,7 @@ public:
    * @param [in] pose The pose of the shape.
    * @param [out] points The points determined for this shape.
    */
-  bool getShapePoints(const shapes::Shape* shape, const Eigen::Affine3d& pose, EigenSTL::vector_Vector3d* points);
+  bool getShapePoints(const shapes::Shape* shape, const Eigen::Isometry3d& pose, EigenSTL::vector_Vector3d* points);
 
   /**
    * \brief Adds the set of points corresponding to the shape at the
@@ -189,10 +185,10 @@ public:
    * @param [in] shape The shape to add to the distance field
    * @param [in] pose The pose of the shape
    */
-  void addShapeToField(const shapes::Shape* shape, const Eigen::Affine3d& pose);
+  void addShapeToField(const shapes::Shape* shape, const Eigen::Isometry3d& pose);
 
   // DEPRECATED form
-  MOVEIT_DEPRECATED void addShapeToField(const shapes::Shape* shape, const geometry_msgs::Pose& pose);
+  [[deprecated]] void addShapeToField(const shapes::Shape* shape, const geometry_msgs::Pose& pose);
 
   /**
    * \brief Adds an octree to the distance field.  Cells that are
@@ -227,11 +223,12 @@ public:
    * @param [in] old_pose The old pose of the shape
    * @param [in] new_pose The new pose of the shape
    */
-  void moveShapeInField(const shapes::Shape* shape, const Eigen::Affine3d& old_pose, const Eigen::Affine3d& new_pose);
+  void moveShapeInField(const shapes::Shape* shape, const Eigen::Isometry3d& old_pose,
+                        const Eigen::Isometry3d& new_pose);
 
   // DEPRECATED form
-  MOVEIT_DEPRECATED void moveShapeInField(const shapes::Shape* shape, const geometry_msgs::Pose& old_pose,
-                                          const geometry_msgs::Pose& new_pose);
+  [[deprecated]] void moveShapeInField(const shapes::Shape* shape, const geometry_msgs::Pose& old_pose,
+                                       const geometry_msgs::Pose& new_pose);
 
   /**
    * \brief All points corresponding to the shape are removed from the
@@ -242,10 +239,10 @@ public:
    * @param [in] shape The shape to remove from the distance field
    * @param [in] pose The pose of the shape to remove
    */
-  void removeShapeFromField(const shapes::Shape* shape, const Eigen::Affine3d& pose);
+  void removeShapeFromField(const shapes::Shape* shape, const Eigen::Isometry3d& pose);
 
   // DEPRECATED form
-  MOVEIT_DEPRECATED void removeShapeFromField(const shapes::Shape* shape, const geometry_msgs::Pose& pose);
+  [[deprecated]] void removeShapeFromField(const shapes::Shape* shape, const geometry_msgs::Pose& pose);
 
   /**
    * \brief Resets all points in the distance field to an uninitialize
@@ -626,5 +623,3 @@ protected:
 };
 
 }  // namespace distance_field
-
-#endif  // MOVEIT_DISTANCE_FIELD_DISTANCE_FIELD_H

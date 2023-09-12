@@ -34,75 +34,63 @@
 
 /* Author: Acorn Pooley, Ioan Sucan */
 
-#ifndef MOVEIT_COLLISION_DETECTION_COLLISION_DETECTOR_
-#define MOVEIT_COLLISION_DETECTION_COLLISION_DETECTOR_
+#pragma once
 
-#include <moveit/collision_detection/collision_robot.h>
-#include <moveit/collision_detection/collision_world.h>
+#include <moveit/collision_detection/collision_env.h>
 #include <moveit/macros/class_forward.h>
 
 namespace collision_detection
 {
-MOVEIT_CLASS_FORWARD(CollisionDetectorAllocator);
+MOVEIT_CLASS_FORWARD(CollisionDetectorAllocator);  // Defines CollisionDetectorAllocatorPtr, ConstPtr, WeakPtr... etc
 
 /** \brief An allocator for a compatible CollisionWorld/CollisionRobot pair. */
 class CollisionDetectorAllocator
 {
 public:
+  virtual ~CollisionDetectorAllocator()
+  {
+  }
+
   /** A unique name identifying the CollisionWorld/CollisionRobot pairing. */
   virtual const std::string& getName() const = 0;
 
   /** create a new CollisionWorld for checking collisions with the supplied world. */
-  virtual CollisionWorldPtr allocateWorld(const WorldPtr& world) const = 0;
+  virtual CollisionEnvPtr allocateEnv(const WorldPtr& world,
+                                      const moveit::core::RobotModelConstPtr& robot_model) const = 0;
 
   /** create a new CollisionWorld by copying an existing CollisionWorld of the same type.s
-   * The world must be either the same world as used by \orig or a copy of that world which has not yet been modified.
+   * The world must be either the same world as used by \e orig or a copy of that world which has not yet been modified.
    */
-  virtual CollisionWorldPtr allocateWorld(const CollisionWorldConstPtr& orig, const WorldPtr& world) const = 0;
+  virtual CollisionEnvPtr allocateEnv(const CollisionEnvConstPtr& orig, const WorldPtr& world) const = 0;
 
-  /** create a new CollisionRobot given a robot_model */
-  virtual CollisionRobotPtr allocateRobot(const robot_model::RobotModelConstPtr& robot_model) const = 0;
-
-  /** create a new CollisionRobot by copying an existing CollisionRobot of the same type. */
-  virtual CollisionRobotPtr allocateRobot(const CollisionRobotConstPtr& orig) const = 0;
+  /** create a new CollisionEnv given a robot_model with a new empty world */
+  virtual CollisionEnvPtr allocateEnv(const moveit::core::RobotModelConstPtr& robot_model) const = 0;
 };
 
 /** \brief Template class to make it easy to create an allocator for a specific CollisionWorld/CollisionRobot pair. */
-template <class CollisionWorldType, class CollisionRobotType, class CollisionDetectorAllocatorType>
+template <class CollisionEnvType, class CollisionDetectorAllocatorType>
 class CollisionDetectorAllocatorTemplate : public CollisionDetectorAllocator
 {
 public:
-  virtual const std::string& getName() const
+  CollisionEnvPtr allocateEnv(const WorldPtr& world, const moveit::core::RobotModelConstPtr& robot_model) const override
   {
-    return CollisionDetectorAllocatorType::NAME_;
+    return CollisionEnvPtr(new CollisionEnvType(robot_model, world));
   }
 
-  virtual CollisionWorldPtr allocateWorld(const WorldPtr& world) const
+  CollisionEnvPtr allocateEnv(const CollisionEnvConstPtr& orig, const WorldPtr& world) const override
   {
-    return CollisionWorldPtr(new CollisionWorldType(world));
+    return CollisionEnvPtr(new CollisionEnvType(dynamic_cast<const CollisionEnvType&>(*orig), world));
   }
 
-  virtual CollisionWorldPtr allocateWorld(const CollisionWorldConstPtr& orig, const WorldPtr& world) const
+  CollisionEnvPtr allocateEnv(const moveit::core::RobotModelConstPtr& robot_model) const override
   {
-    return CollisionWorldPtr(new CollisionWorldType(dynamic_cast<const CollisionWorldType&>(*orig), world));
+    return CollisionEnvPtr(new CollisionEnvType(robot_model));
   }
 
-  virtual CollisionRobotPtr allocateRobot(const robot_model::RobotModelConstPtr& robot_model) const
-  {
-    return CollisionRobotPtr(new CollisionRobotType(robot_model));
-  }
-
-  virtual CollisionRobotPtr allocateRobot(const CollisionRobotConstPtr& orig) const
-  {
-    return CollisionRobotPtr(new CollisionRobotType(dynamic_cast<const CollisionRobotType&>(*orig)));
-  }
-
-  /** Create an allocator for FCL collision detectors */
+  /** Create an allocator for collision detectors. */
   static CollisionDetectorAllocatorPtr create()
   {
     return CollisionDetectorAllocatorPtr(new CollisionDetectorAllocatorType());
   }
 };
-}
-
-#endif
+}  // namespace collision_detection

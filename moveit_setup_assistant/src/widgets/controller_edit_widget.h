@@ -33,20 +33,19 @@
 
 /* Author: Mohamad Ayman */
 
-#ifndef MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_CONTROLLER_EDIT_WIDGET_H
-#define MOVEIT_ROS_MOVEIT_SETUP_ASSISTANT_WIDGETS_CONTROLLER_EDIT_WIDGET_H
+#pragma once
 
 #include <QWidget>
-#include <QLabel>
-#include <QLineEdit>
-#include <QComboBox>
-#include <QPushButton>
+class QComboBox;
+class QLabel;
+class QLineEdit;
+class QPushButton;
 
 #ifndef Q_MOC_RUN
 #include <moveit/setup_assistant/tools/moveit_config_data.h>
 #endif
 
-namespace moveit_ros_control
+namespace moveit_setup_assistant
 {
 class ControllerEditWidget : public QWidget
 {
@@ -58,7 +57,7 @@ public:
   // ******************************************************************************************
 
   /// Constructor
-  ControllerEditWidget(QWidget* parent, moveit_setup_assistant::MoveItConfigDataPtr config_data);
+  ControllerEditWidget(QWidget* parent, const MoveItConfigDataPtr& config_data);
 
   /// Set the previous data
   void setSelected(const std::string& controller_name);
@@ -141,6 +140,4 @@ private:
   /// Contains all the configuration data for the setup assistant
   moveit_setup_assistant::MoveItConfigDataPtr config_data_;
 };
-}
-
-#endif
+}  // namespace moveit_setup_assistant

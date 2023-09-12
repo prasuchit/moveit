@@ -34,8 +34,7 @@
 
 /* Author: Yannick Jonetzko */
 
-#ifndef MOVEIT_TRAJECTORY_RVIZ_PLUGIN_TRAJECTORY_PANEL_
-#define MOVEIT_TRAJECTORY_RVIZ_PLUGIN_TRAJECTORY_PANEL_
+#pragma once
 
 #ifndef Q_MOC_RUN
 #include <ros/ros.h>
@@ -54,11 +53,11 @@ class TrajectoryPanel : public rviz::Panel
   Q_OBJECT
 
 public:
-  TrajectoryPanel(QWidget* parent = 0);
+  TrajectoryPanel(QWidget* parent = nullptr);
 
-  virtual ~TrajectoryPanel();
+  ~TrajectoryPanel() override;
 
-  void onInitialize();
+  void onInitialize() override;
   void onEnable();
   void onDisable();
   void update(int way_point_count);
@@ -93,5 +92,3 @@ protected:
 };
 
 }  // namespace moveit_rviz_plugin
-
-#endif

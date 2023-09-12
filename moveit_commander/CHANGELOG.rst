@@ -2,7 +2,163 @@
 Changelog for package moveit_commander
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.9.12 (2018-05-29)
+1.1.13 (2023-07-28)
+-------------------
+
+1.1.12 (2023-05-13)
+-------------------
+* Rename argument of execute() to trajectory (`#3392 <https://github.com/ros-planning/moveit/issues/3392>`_)
+* Disentangle joint name methods, add group_state (`#3345 <https://github.com/ros-planning/moveit/issues/3345>`_)
+* Fix plan() and add corresponding unit tests (`#3302 <https://github.com/ros-planning/moveit/issues/3302>`_)
+* Contributors: Michael Görner, Robert Haschke
+
+1.1.11 (2022-12-21)
+-------------------
+* Fix some consistency issues in PlanningScene handling (`#3298 <https://github.com/ros-planning/moveit/issues/3298>`_)
+
+  * Allow Plane collision-object creation from rviz
+  * Allow to create cone collision-object from python PSI
+  * rviz: Visualize PLANE shapes as a large, thin box
+* Merge fixes+improvements to ``PlanningScene`` editing in rviz: `#3263 <https://github.com/ros-planning/moveit/issues/3263>`_, `#3264 <https://github.com/ros-planning/moveit/issues/3264>`_, `#3296 <https://github.com/ros-planning/moveit/issues/3296>`_
+* ``moveit_commander.PlanningSceneInterface``: use synchronous interface by default
+* Contributors: Robert Haschke
+
+1.1.10 (2022-09-13)
+-------------------
+* Limit Cartesian speed for link(s) (`#2856 <https://github.com/ros-planning/moveit/issues/2856>`_)
+* Validate JointState argument to `moveit_commander.set_joint_value_target` (`#3187 <https://github.com/ros-planning/moveit/issues/3187>`_)
+* Adjust python PSI to new CollisionObject.pose interface (`#3176 <https://github.com/ros-planning/moveit/issues/3176>`_)
+* moveit_commander: make current joint state copy-paste-able (`#3133 <https://github.com/ros-planning/moveit/issues/3133>`_)
+* Replace obsolete distutils.core with setuptools (`#3103 <https://github.com/ros-planning/moveit/issues/3103>`_)
+* Contributors: Filip Sund, Michael Görner, Stephanie Eng
+
+1.1.9 (2022-03-06)
+------------------
+* Fix move_group_commander.go(tuple(...)) (`#3066 <https://github.com/ros-planning/moveit/issues/3066>`_)
+* Contributors: Hongzhuo Liang, Michael Görner
+
+1.1.8 (2022-01-30)
+------------------
+
+1.1.7 (2021-12-31)
+------------------
+
+1.1.6 (2021-11-06)
+------------------
+* Use relative imports (`#2912 <https://github.com/ros-planning/moveit/issues/2912>`_)
+* Fix trajectory constraints (`#2429 <https://github.com/ros-planning/moveit/issues/2429>`_)
+* Fix ``get_planning_pipeline_id`` in Python MGI (`#2753 <https://github.com/ros-planning/moveit/issues/2753>`_)
+* Contributors: Felix von Drigalski, Kevin Chang, Michael Görner, Robert Haschke
+
+1.1.5 (2021-05-23)
+------------------
+* Allow selecting planning pipeline in MotionSequenceAction (`#2657 <https://github.com/ros-planning/moveit/issues/2657>`_)
+* Contributors: Felix von Drigalski
+
+1.1.4 (2021-05-12)
+------------------
+
+1.1.3 (2021-04-29)
+------------------
+* Add planning_pipeline_id setting to Python MGI (`#2622 <https://github.com/ros-planning/moveit/issues/2622>`_)
+* Add clear() to Python PSI, allow empty call to remove_attached_object (`#2609 <https://github.com/ros-planning/moveit/issues/2609>`_)
+* Contributors: Felix von Drigalski
+
+1.1.2 (2021-04-08)
+------------------
+* Fix formatting errors
+* Add utility functions to Python PSI: add/detach objects, apply_planning_scene() (`#2532 <https://github.com/ros-planning/moveit/issues/2532>`_)
+* add get_active_joint_names (`#2533 <https://github.com/ros-planning/moveit/issues/2533>`_)
+* Add get_current_state_bounded(), get_current_state(), enforce_bounds() to MoveGroupCommander (`#2356 <https://github.com/ros-planning/moveit/issues/2356>`_)
+* Contributors: Felix von Drigalski, Peter Mitrano, Tyler Weaver
+
+1.1.1 (2020-10-13)
+------------------
+* [feature] MGC: Improve exception messages (`#2318 <https://github.com/ros-planning/moveit/issues/2318>`_)
+* [fix] ROS namespacing in moveit_commander's PSI (`#2347 <https://github.com/ros-planning/moveit/issues/2347>`_)
+* [fix] python3 issues (`#2323 <https://github.com/ros-planning/moveit/issues/2323>`_)
+* Contributors: Michael Görner, Peter Mitrano, Robert Haschke
+
+1.1.0 (2020-09-04)
+------------------
+* [feature] Add missing variants of place from list of PlaceLocations and Poses in the python interface (`#2231 <https://github.com/ros-planning/moveit/issues/2231>`_)
+* [fix]     Add default velocity/acceleration scaling factors (`#1890 <https://github.com/ros-planning/moveit/issues/1890>`_)
+* [fix]     Handle the updated plan() function of MoveGroupCommander (`#1640 <https://github.com/ros-planning/moveit/issues/1640>`_)
+* [fix]     Fix `failing tutorial <https://github.com/ros-planning/moveit_tutorials/issues/301>`_ (`#1459 <https://github.com/ros-planning/moveit/issues/1459>`_)
+* [maint]   Update dependencies for python3 in noetic (`#2131 <https://github.com/ros-planning/moveit/issues/2131>`_)
+* [maint]   Better align MoveGroupInterface.plan() with C++ MoveGroup::plan() (`#790 <https://github.com/ros-planning/moveit/issues/790>`_)
+* Contributors: Bence Magyar, Bjar Ne, Dave Coleman, Felix von Drigalski, Gerard Canal, Jafar Abdi, Masaki Murooka, Michael Ferguson, Michael Görner, Pavel-P, Raphael Druon, Robert Haschke, Ryodo Tanaka, Ryosuke Tajima, Sean Yen, v4hn
+
+1.0.6 (2020-08-19)
+------------------
+* [maint]   Adapt repository for splitted moveit_resources layout (`#2199 <https://github.com/ros-planning/moveit/issues/2199>`_)
+* [feature] Exposed parameter wait_for_servers and getPlannerId() API in MoveGroup's Python API (`#2201 <https://github.com/ros-planning/moveit/issues/2201>`_)
+* Contributors: Gerard Canal, Robert Haschke, Michael Görner
+
+1.0.5 (2020-07-08)
+------------------
+* [fix]   Python 3 fix (`#2030 <https://github.com/ros-planning/moveit/issues/2030>`_)
+* Contributors: Henning Kayser, Michael Görner, Robert Haschke
+
+1.0.4 (2020-05-30)
+------------------
+
+1.0.3 (2020-04-26)
+------------------
+* [feature] Expose reference_point_position parameter in getJacobian() (`#1595 <https://github.com/ros-planning/moveit/issues/1595>`_)
+* [maint]   Improve Python 3 compatibility (`#1870 <https://github.com/ros-planning/moveit/issues/1870>`_)
+  * Replaced StringIO with BytesIO for python msg serialization
+  * Use py_bindings_tools::ByteString as byte-based serialization buffer on C++ side
+* [fix]     Fix service call to utilize original name space (`#1959 <https://github.com/ros-planning/moveit/issues/1959>`_)
+* [maint]   Windows compatibility: fallback to using `pyreadline` (`#1635 <https://github.com/ros-planning/moveit/issues/1635>`_)
+* [maint]   Use CMAKE_CXX_STANDARD to enforce c++14 (`#1607 <https://github.com/ros-planning/moveit/issues/1607>`_)
+* [fix]     Fix planning scene interface not respecting custom namespace (`#1815 <https://github.com/ros-planning/moveit/issues/1815>`_)
+* [maint]   moveit_commander: python3 import fixes (`#1786 <https://github.com/ros-planning/moveit/issues/1786>`_)
+* [fix]     python planning_scene_interface: fix attaching objects (`#1624 <https://github.com/ros-planning/moveit/issues/1624>`_)
+* [feature] Select time parametrization algorithm in retime_trajectory (`#1508 <https://github.com/ros-planning/moveit/issues/1508>`_)
+* Contributors: Bjar Ne, Felix von Drigalski, Masaki Murooka, Pavel-P, Raphael Druon, Robert Haschke, Ryodo Tanaka, Sean Yen, v4hn
+
+1.0.2 (2019-06-28)
+------------------
+* [feature]     Add get_jacobian_matrix to moveit_commander (`#1501 <https://github.com/ros-planning/moveit/issues/1501>`_)
+* [maintanance] Cleanup Python PlanningSceneInterface (`#1405 <https://github.com/ros-planning/moveit/issues/1405>`_, `#789 <https://github.com/ros-planning/moveit/issues/789>`_)
+* Contributors: Bence Magyar, Robert Haschke, Ryosuke Tajima
+
+1.0.1 (2019-03-08)
+------------------
+* [capability] python PlanningSceneInterface.add_cylinder() (`#1372 <https://github.com/ros-planning/moveit/issues/1372>`_)
+* Contributors: Robert Haschke
+
+1.0.0 (2019-02-24)
+------------------
+* [fix] catkin_lint issues (`#1341 <https://github.com/ros-planning/moveit/issues/1341>`_)
+* Contributors: Keerthana Subramanian Manivannan, Robert Haschke
+
+0.10.8 (2018-12-24)
+-------------------
+
+0.10.7 (2018-12-13)
+-------------------
+
+0.10.6 (2018-12-09)
+-------------------
+
+0.10.5 (2018-11-01)
+-------------------
+
+0.10.4 (2018-10-29)
+-------------------
+
+0.10.3 (2018-10-29)
+-------------------
+
+0.10.2 (2018-10-24)
+-------------------
+* [capability] Added plan_only flags to pick and place (`#862 <https://github.com/ros-planning/moveit/issues/862>`_)
+* [maintenance] Python3 support (`#1103 <https://github.com/ros-planning/moveit/issues/1103>`_, `#1054 <https://github.com/ros-planning/moveit/issues/1054>`_)
+* Contributors: David Watkins, Michael Görner, d-walsh, mike lautman
+
+0.10.1 (2018-05-25)
 -------------------
 * Get robot markers from state (`#836 <https://github.com/ros-planning/moveit/issues/836>`_)
 * Add namespace capabilities to moveit_commander (`#835 <https://github.com/ros-planning/moveit/issues/835>`_)

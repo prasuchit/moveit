@@ -1,38 +1,36 @@
-# moveit/moveit:kinetic-source
-# Downloads the moveit source code, install remaining debian dependencies, and builds workspace
+# syntax = docker/dockerfile:1.3
 
-FROM moveit/moveit:kinetic-ci-shadow-fixed
-MAINTAINER Dave Coleman dave@dav.ee
+# moveit/moveit:noetic-source
+# Downloads the moveit source code and install remaining debian dependencies
 
-ENV CATKIN_WS=/root/ws_moveit
-RUN mkdir -p $CATKIN_WS/src
-WORKDIR $CATKIN_WS/src
+ARG IMAGE=noetic
+FROM moveit/moveit:${IMAGE}-ci-testing
+MAINTAINER Robert Haschke rhaschke@techfak.uni-bielefeld.de
 
-# Download moveit source
-RUN wstool init . && \
-    wstool merge https://raw.githubusercontent.com/ros-planning/moveit/${ROS_DISTRO}-devel/moveit.rosinstall && \
-    wstool update
-
-# Update apt-get because osrf image clears this cache. download deps
-# Note that because we're building on top of kinetic-ci, there should not be any deps installed
-# unless something has changed in the source code since the other container was made
-# (they are triggered together so should only be one-build out of sync)
-RUN apt-get -qq update && \
-    apt-get -qq install -y \
-        wget && \
-    rosdep update && \
-    rosdep install -y --from-paths . --ignore-src --rosdistro ${ROS_DISTRO} --as-root=apt:false && \
-    rm -rf /var/lib/apt/lists/*
-
-# Replacing shell with bash for later docker build commands
-RUN mv /bin/sh /bin/sh-old && \
-    ln -s /bin/bash /bin/sh
-
-# Build repo
-WORKDIR $CATKIN_WS
-ENV TERM xterm
 ENV PYTHONIOENCODING UTF-8
-RUN catkin config --extend /opt/ros/$ROS_DISTRO --install --cmake-args -DCMAKE_BUILD_TYPE=Release && \
-    # Status rate is limited so that just enough info is shown to keep Docker from timing out, but not too much
-    # such that the Docker log gets too long (another form of timeout)
-    catkin build --jobs 1 --limit-status-rate 0.001 --no-notify
+# Export ROS_UNDERLAY for downstream docker containers
+ENV ROS_UNDERLAY /root/ws_moveit/install
+# Environment variable used in instructions on moveit.ros.org website for running clang-tidy
+ENV CATKIN_WS $(realpath $ROS_UNDERLAY/..)
+WORKDIR $ROS_UNDERLAY/..
+
+# Copy MoveIt sources from docker context
+COPY . src/moveit
+
+# Commands are combined in single RUN statement with "apt/lists" folder removal to reduce image size
+# https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#minimize-the-number-of-layers
+RUN --mount=type=cache,target=/root/.ccache/ \
+    # Enable ccache
+    PATH=/usr/lib/ccache:$PATH && \
+    # Fetch required upstream sources for building
+    wstool init --shallow src src/moveit/.github/workflows/upstream.rosinstall && \
+    git clone --depth 1 --branch master https://github.com/ros-planning/moveit_resources src/moveit_resources && \
+    #
+    catkin config --extend /opt/ros/$ROS_DISTRO --install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && \
+    # Status rate is limited so that just enough info is shown to keep Docker from timing out,
+    # but not too much such that the Docker log gets too long (another form of timeout)
+    catkin build --limit-status-rate 0.001 --no-notify && \
+    ccache -s && \
+    #
+    # Update /ros_entrypoint.sh to source our new workspace
+    sed -i "s#/opt/ros/\$ROS_DISTRO/setup.bash#$ROS_UNDERLAY/setup.sh#g" /ros_entrypoint.sh

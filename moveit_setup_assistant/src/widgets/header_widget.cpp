@@ -34,11 +34,13 @@
 
 /* Author: Dave Coleman */
 
-#include <QPushButton>
-#include <QFont>
-#include <QFileDialog>
-#include <QVBoxLayout>
 #include "header_widget.h"
+#include <QFileDialog>
+#include <QFont>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
 
 namespace moveit_setup_assistant
 {
@@ -52,7 +54,6 @@ HeaderWidget::HeaderWidget(const std::string& title, const std::string& instruct
 {
   // Basic widget container
   QVBoxLayout* layout = new QVBoxLayout(this);
-  layout->setAlignment(Qt::AlignTop);
 
   // Page Title
   QLabel* page_title = new QLabel(this);
@@ -60,23 +61,23 @@ HeaderWidget::HeaderWidget(const std::string& title, const std::string& instruct
   QFont page_title_font(QFont().defaultFamily(), 18, QFont::Bold);
   page_title->setFont(page_title_font);
   page_title->setWordWrap(true);
+  page_title->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
   layout->addWidget(page_title);
-  layout->setAlignment(page_title, Qt::AlignTop);
 
   // Page Instructions
   QLabel* page_instructions = new QLabel(this);
   page_instructions->setText(instructions.c_str());
   page_instructions->setWordWrap(true);
-  // page_instructions->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Expanding );
-  page_instructions->setMinimumWidth(1);
+  page_instructions->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
   layout->addWidget(page_instructions);
-  layout->setAlignment(page_instructions, Qt::AlignTop);
 
   // Margin on bottom
   layout->setContentsMargins(0, 0, 0, 0);  // last 15
 
   this->setLayout(layout);
-  // this->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Expanding );
+
+  // For some reason, this style sheet setting affects the placement layout!?
+  this->setStyleSheet(QString("background-color:%1;").arg(QWidget::palette().color(QWidget::backgroundRole()).name()));
 }
 
 // ******************************************************************************************
@@ -129,7 +130,7 @@ LoadPathWidget::LoadPathWidget(const QString& title, const QString& instructions
   // Button
   QPushButton* browse_button = new QPushButton(this);
   browse_button->setText("Browse");
-  connect(browse_button, SIGNAL(clicked()), this, SLOT(btn_file_dialog()));
+  connect(browse_button, SIGNAL(clicked()), this, SLOT(btnFileDialog()));
   hlayout->addWidget(browse_button);
 
   // Add horizontal layer to verticle layer
@@ -141,7 +142,7 @@ LoadPathWidget::LoadPathWidget(const QString& title, const QString& instructions
 // ******************************************************************************************
 // Load the file dialog
 // ******************************************************************************************
-void LoadPathWidget::btn_file_dialog()
+void LoadPathWidget::btnFileDialog()
 {
   QString path;
   if (dir_only_)  // only allow user to select a directory
@@ -166,7 +167,7 @@ void LoadPathWidget::btn_file_dialog()
   }
 
   // check they did not press cancel
-  if (path != NULL)
+  if (!path.isNull())
     path_box_->setText(path);
 }
 
@@ -229,4 +230,4 @@ void LoadPathArgsWidget::setArgsEnabled(bool enabled)
 {
   args_->setEnabled(enabled);
 }
-}
+}  // namespace moveit_setup_assistant

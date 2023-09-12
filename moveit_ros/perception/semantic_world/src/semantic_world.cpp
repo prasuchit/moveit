@@ -38,7 +38,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/Quaternion.h>
 
-// MoveIt!
+// MoveIt
 #include <moveit/semantic_world/semantic_world.h>
 #include <geometric_shapes/shape_operations.h>
 #include <moveit_msgs/PlanningScene.h>
@@ -47,13 +47,15 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 // Eigen
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
 #include <Eigen/Geometry>
 
 namespace moveit
 {
 namespace semantic_world
 {
+static const std::string LOGNAME = "semantic_world";
+
 SemanticWorld::SemanticWorld(const planning_scene::PlanningSceneConstPtr& planning_scene)
   : planning_scene_(planning_scene)
 {
@@ -66,7 +68,7 @@ SemanticWorld::SemanticWorld(const planning_scene::PlanningSceneConstPtr& planni
 visualization_msgs::MarkerArray
 SemanticWorld::getPlaceLocationsMarker(const std::vector<geometry_msgs::PoseStamped>& poses) const
 {
-  ROS_DEBUG("Visualizing: %d place poses", (int)poses.size());
+  ROS_DEBUG_NAMED(LOGNAME, "Visualizing: %d place poses", (int)poses.size());
   visualization_msgs::MarkerArray marker;
   for (std::size_t i = 0; i < poses.size(); ++i)
   {
@@ -224,14 +226,15 @@ SemanticWorld::generatePlacePoses(const std::string& table_name, const shapes::S
   }
 
   std::vector<geometry_msgs::PoseStamped> place_poses;
-  ROS_ERROR("Did not find table %s to place on", table_name.c_str());
+  ROS_ERROR_NAMED(LOGNAME, "Did not find table %s to place on", table_name.c_str());
   return place_poses;
 }
 
-std::vector<geometry_msgs::PoseStamped> SemanticWorld::generatePlacePoses(
-    const object_recognition_msgs::Table& chosen_table, const shapes::ShapeConstPtr& object_shape,
-    const geometry_msgs::Quaternion& object_orientation, double resolution, double delta_height,
-    unsigned int num_heights) const
+std::vector<geometry_msgs::PoseStamped>
+SemanticWorld::generatePlacePoses(const object_recognition_msgs::Table& chosen_table,
+                                  const shapes::ShapeConstPtr& object_shape,
+                                  const geometry_msgs::Quaternion& object_orientation, double resolution,
+                                  double delta_height, unsigned int num_heights) const
 {
   std::vector<geometry_msgs::PoseStamped> place_poses;
   if (object_shape->type != shapes::MESH && object_shape->type != shapes::SPHERE && object_shape->type != shapes::BOX &&
@@ -245,9 +248,9 @@ std::vector<geometry_msgs::PoseStamped> SemanticWorld::generatePlacePoses(
   double z_min(std::numeric_limits<double>::max()), z_max(-std::numeric_limits<double>::max());
 
   Eigen::Quaterniond rotation(object_orientation.x, object_orientation.y, object_orientation.z, object_orientation.w);
-  Eigen::Affine3d object_pose(rotation);
-  double min_distance_from_edge;
-  double height_above_table;
+  Eigen::Isometry3d object_pose(rotation);
+  double min_distance_from_edge = 0;
+  double height_above_table = 0;
 
   if (object_shape->type == shapes::MESH)
   {
@@ -326,9 +329,8 @@ std::vector<geometry_msgs::PoseStamped> SemanticWorld::generatePlacePoses(const 
     else if (table.convex_hull[j].y > y_max)
       y_max = table.convex_hull[j].y;
   }
-  for (std::size_t j = 0; j < table.convex_hull.size(); ++j)
-    table_contour.push_back(
-        cv::Point((table.convex_hull[j].x - x_min) * scale_factor, (table.convex_hull[j].y - y_min) * scale_factor));
+  for (const geometry_msgs::Point& vertex : table.convex_hull)
+    table_contour.push_back(cv::Point((vertex.x - x_min) * scale_factor, (vertex.y - y_min) * scale_factor));
 
   double x_range = fabs(x_max - x_min);
   double y_range = fabs(y_max - y_min);
@@ -347,7 +349,7 @@ std::vector<geometry_msgs::PoseStamped> SemanticWorld::generatePlacePoses(const 
   unsigned int num_x = fabs(x_max - x_min) / resolution + 1;
   unsigned int num_y = fabs(y_max - y_min) / resolution + 1;
 
-  ROS_DEBUG("Num points for possible place operations: %d %d", num_x, num_y);
+  ROS_DEBUG_NAMED(LOGNAME, "Num points for possible place operations: %d %d", num_x, num_y);
 
   std::vector<std::vector<cv::Point> > contours;
   std::vector<cv::Vec4i> hierarchy;
@@ -367,8 +369,8 @@ std::vector<geometry_msgs::PoseStamped> SemanticWorld::generatePlacePoses(const 
         {
           Eigen::Vector3d point((double)(point_x) / scale_factor + x_min, (double)(point_y) / scale_factor + y_min,
                                 height_above_table + mm * delta_height);
-          Eigen::Affine3d pose;
-          tf::poseMsgToEigen(table.pose, pose);
+          Eigen::Isometry3d pose;
+          tf2::fromMsg(table.pose, pose);
           point = pose * point;
           geometry_msgs::PoseStamped place_pose;
           place_pose.pose.orientation.w = 1.0;
@@ -404,9 +406,8 @@ bool SemanticWorld::isInsideTableContour(const geometry_msgs::Pose& pose, const 
   }
   const int scale_factor = 100;
   std::vector<cv::Point2f> table_contour;
-  for (std::size_t j = 0; j < table.convex_hull.size(); ++j)
-    table_contour.push_back(
-        cv::Point((table.convex_hull[j].x - x_min) * scale_factor, (table.convex_hull[j].y - y_min) * scale_factor));
+  for (const geometry_msgs::Point& vertex : table.convex_hull)
+    table_contour.push_back(cv::Point((vertex.x - x_min) * scale_factor, (vertex.y - y_min) * scale_factor));
 
   double x_range = fabs(x_max - x_min);
   double y_range = fabs(y_max - y_min);
@@ -427,15 +428,15 @@ bool SemanticWorld::isInsideTableContour(const geometry_msgs::Pose& pose, const 
   cv::findContours(src, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
 
   Eigen::Vector3d point(pose.position.x, pose.position.y, pose.position.z);
-  Eigen::Affine3d pose_table;
-  tf::poseMsgToEigen(table.pose, pose_table);
+  Eigen::Isometry3d pose_table;
+  tf2::fromMsg(table.pose, pose_table);
 
   // Point in table frame
   point = pose_table.inverse() * point;
   // Assuming Z axis points upwards for the table
   if (point.z() < -fabs(min_vertical_offset))
   {
-    ROS_ERROR("Object is not above table");
+    ROS_ERROR_NAMED(LOGNAME, "Object is not above table");
     return false;
   }
 
@@ -443,12 +444,9 @@ bool SemanticWorld::isInsideTableContour(const geometry_msgs::Pose& pose, const 
   int point_y = (point.y() - y_min) * scale_factor;
   cv::Point2f point2f(point_x, point_y);
   double result = cv::pointPolygonTest(contours[0], point2f, true);
-  ROS_DEBUG("table distance: %f", result);
+  ROS_DEBUG_NAMED(LOGNAME, "table distance: %f", result);
 
-  if ((int)result >= (int)(min_distance_from_edge * scale_factor))
-    return true;
-
-  return false;
+  return (int)result >= (int)(min_distance_from_edge * scale_factor);
 }
 
 std::string SemanticWorld::findObjectTable(const geometry_msgs::Pose& pose, double min_distance_from_edge,
@@ -457,7 +455,7 @@ std::string SemanticWorld::findObjectTable(const geometry_msgs::Pose& pose, doub
   std::map<std::string, object_recognition_msgs::Table>::const_iterator it;
   for (it = current_tables_in_collision_world_.begin(); it != current_tables_in_collision_world_.end(); ++it)
   {
-    ROS_DEBUG("Testing table: %s", it->first.c_str());
+    ROS_DEBUG_STREAM_NAMED(LOGNAME, "Testing table: " << it->first);
     if (isInsideTableContour(pose, it->second, min_distance_from_edge, min_vertical_offset))
       return it->first;
   }
@@ -467,54 +465,55 @@ std::string SemanticWorld::findObjectTable(const geometry_msgs::Pose& pose, doub
 void SemanticWorld::tableCallback(const object_recognition_msgs::TableArrayPtr& msg)
 {
   table_array_ = *msg;
-  ROS_INFO("Table callback with %d tables", (int)table_array_.tables.size());
+  ROS_INFO_NAMED(LOGNAME, "Table callback with %d tables", (int)table_array_.tables.size());
   transformTableArray(table_array_);
   // Callback on an update
   if (table_callback_)
   {
-    ROS_INFO("Calling table callback");
+    ROS_INFO_NAMED(LOGNAME, "Calling table callback");
     table_callback_();
   }
 }
 
 void SemanticWorld::transformTableArray(object_recognition_msgs::TableArray& table_array) const
 {
-  for (std::size_t i = 0; i < table_array.tables.size(); ++i)
+  for (object_recognition_msgs::Table& table : table_array.tables)
   {
-    std::string original_frame = table_array.tables[i].header.frame_id;
-    if (table_array.tables[i].convex_hull.empty())
+    std::string original_frame = table.header.frame_id;
+    if (table.convex_hull.empty())
       continue;
-    ROS_INFO_STREAM("Original pose: " << table_array.tables[i].pose.position.x << ","
-                                      << table_array.tables[i].pose.position.y << ","
-                                      << table_array.tables[i].pose.position.z);
+    ROS_INFO_STREAM_NAMED(LOGNAME, "Original pose: " << table.pose.position.x << "," << table.pose.position.y << ","
+                                                     << table.pose.position.z);
     std::string error_text;
-    const Eigen::Affine3d& original_transform = planning_scene_->getTransforms().getTransform(original_frame);
-    Eigen::Affine3d original_pose;
-    tf::poseMsgToEigen(table_array.tables[i].pose, original_pose);
+    const Eigen::Isometry3d& original_transform = planning_scene_->getFrameTransform(original_frame);
+    Eigen::Isometry3d original_pose;
+    tf2::fromMsg(table.pose, original_pose);
     original_pose = original_transform * original_pose;
-    tf::poseEigenToMsg(original_pose, table_array.tables[i].pose);
-    table_array.tables[i].header.frame_id = planning_scene_->getTransforms().getTargetFrame();
-    ROS_INFO_STREAM("Successfully transformed table array from " << original_frame << "to "
-                                                                 << table_array.tables[i].header.frame_id);
-    ROS_INFO_STREAM("Transformed pose: " << table_array.tables[i].pose.position.x << ","
-                                         << table_array.tables[i].pose.position.y << ","
-                                         << table_array.tables[i].pose.position.z);
+    table.pose = tf2::toMsg(original_pose);
+    table.header.frame_id = planning_scene_->getTransforms().getTargetFrame();
+    ROS_INFO_STREAM_NAMED(LOGNAME, "Successfully transformed table array from " << original_frame << "to "
+                                                                                << table.header.frame_id);
+    ROS_INFO_STREAM_NAMED(LOGNAME, "Transformed pose: " << table.pose.position.x << "," << table.pose.position.y << ","
+                                                        << table.pose.position.z);
   }
 }
 
 shapes::Mesh* SemanticWorld::orientPlanarPolygon(const shapes::Mesh& polygon) const
 {
   if (polygon.vertex_count < 3 || polygon.triangle_count < 1)
-    return 0;
+    return nullptr;
   // first get the normal of the first triangle of the input polygon
   Eigen::Vector3d vec1, vec2, vec3, normal;
 
-  int vIdx1 = polygon.triangles[0];
-  int vIdx2 = polygon.triangles[1];
-  int vIdx3 = polygon.triangles[2];
-  vec1 = Eigen::Vector3d(polygon.vertices[vIdx1 * 3], polygon.vertices[vIdx1 * 3 + 1], polygon.vertices[vIdx1 * 3 + 2]);
-  vec2 = Eigen::Vector3d(polygon.vertices[vIdx2 * 3], polygon.vertices[vIdx2 * 3 + 1], polygon.vertices[vIdx2 * 3 + 2]);
-  vec3 = Eigen::Vector3d(polygon.vertices[vIdx3 * 3], polygon.vertices[vIdx3 * 3 + 1], polygon.vertices[vIdx3 * 3 + 2]);
+  int v_idx1 = polygon.triangles[0];
+  int v_idx2 = polygon.triangles[1];
+  int v_idx3 = polygon.triangles[2];
+  vec1 =
+      Eigen::Vector3d(polygon.vertices[v_idx1 * 3], polygon.vertices[v_idx1 * 3 + 1], polygon.vertices[v_idx1 * 3 + 2]);
+  vec2 =
+      Eigen::Vector3d(polygon.vertices[v_idx2 * 3], polygon.vertices[v_idx2 * 3 + 1], polygon.vertices[v_idx2 * 3 + 2]);
+  vec3 =
+      Eigen::Vector3d(polygon.vertices[v_idx3 * 3], polygon.vertices[v_idx3 * 3 + 1], polygon.vertices[v_idx3 * 3 + 2]);
   vec2 -= vec1;
   vec3 -= vec1;
   normal = vec3.cross(vec2);
@@ -532,18 +531,18 @@ shapes::Mesh* SemanticWorld::orientPlanarPolygon(const shapes::Mesh& polygon) co
   // copy the first set of triangles
   memcpy(solid->triangles, polygon.triangles, polygon.triangle_count * 3 * sizeof(unsigned int));
 
-  for (unsigned tIdx = 0; tIdx < polygon.triangle_count; ++tIdx)
+  for (unsigned t_idx = 0; t_idx < polygon.triangle_count; ++t_idx)
   {
-    int vIdx1 = polygon.triangles[tIdx * 3];
-    int vIdx2 = polygon.triangles[tIdx * 3 + 1];
-    int vIdx3 = polygon.triangles[tIdx * 3 + 2];
+    int v_idx1 = polygon.triangles[t_idx * 3];
+    int v_idx2 = polygon.triangles[t_idx * 3 + 1];
+    int v_idx3 = polygon.triangles[t_idx * 3 + 2];
 
-    vec1 =
-        Eigen::Vector3d(polygon.vertices[vIdx1 * 3], polygon.vertices[vIdx1 * 3 + 1], polygon.vertices[vIdx1 * 3 + 2]);
-    vec2 =
-        Eigen::Vector3d(polygon.vertices[vIdx2 * 3], polygon.vertices[vIdx2 * 3 + 1], polygon.vertices[vIdx2 * 3 + 2]);
-    vec3 =
-        Eigen::Vector3d(polygon.vertices[vIdx3 * 3], polygon.vertices[vIdx3 * 3 + 1], polygon.vertices[vIdx3 * 3 + 2]);
+    vec1 = Eigen::Vector3d(polygon.vertices[v_idx1 * 3], polygon.vertices[v_idx1 * 3 + 1],
+                           polygon.vertices[v_idx1 * 3 + 2]);
+    vec2 = Eigen::Vector3d(polygon.vertices[v_idx2 * 3], polygon.vertices[v_idx2 * 3 + 1],
+                           polygon.vertices[v_idx2 * 3 + 2]);
+    vec3 = Eigen::Vector3d(polygon.vertices[v_idx3 * 3], polygon.vertices[v_idx3 * 3 + 1],
+                           polygon.vertices[v_idx3 * 3 + 2]);
 
     vec2 -= vec1;
     vec3 -= vec1;
@@ -551,7 +550,7 @@ shapes::Mesh* SemanticWorld::orientPlanarPolygon(const shapes::Mesh& polygon) co
     Eigen::Vector3d triangle_normal = vec2.cross(vec1);
 
     if (triangle_normal.dot(normal) < 0.0)
-      std::swap(solid->triangles[tIdx * 3 + 1], solid->triangles[tIdx * 3 + 2]);
+      std::swap(solid->triangles[t_idx * 3 + 1], solid->triangles[t_idx * 3 + 2]);
   }
   return solid;
 }
@@ -559,16 +558,19 @@ shapes::Mesh* SemanticWorld::orientPlanarPolygon(const shapes::Mesh& polygon) co
 shapes::Mesh* SemanticWorld::createSolidMeshFromPlanarPolygon(const shapes::Mesh& polygon, double thickness) const
 {
   if (polygon.vertex_count < 3 || polygon.triangle_count < 1 || thickness <= 0)
-    return 0;
+    return nullptr;
   // first get the normal of the first triangle of the input polygon
   Eigen::Vector3d vec1, vec2, vec3, normal;
 
-  int vIdx1 = polygon.triangles[0];
-  int vIdx2 = polygon.triangles[1];
-  int vIdx3 = polygon.triangles[2];
-  vec1 = Eigen::Vector3d(polygon.vertices[vIdx1 * 3], polygon.vertices[vIdx1 * 3 + 1], polygon.vertices[vIdx1 * 3 + 2]);
-  vec2 = Eigen::Vector3d(polygon.vertices[vIdx2 * 3], polygon.vertices[vIdx2 * 3 + 1], polygon.vertices[vIdx2 * 3 + 2]);
-  vec3 = Eigen::Vector3d(polygon.vertices[vIdx3 * 3], polygon.vertices[vIdx3 * 3 + 1], polygon.vertices[vIdx3 * 3 + 2]);
+  int v_idx1 = polygon.triangles[0];
+  int v_idx2 = polygon.triangles[1];
+  int v_idx3 = polygon.triangles[2];
+  vec1 =
+      Eigen::Vector3d(polygon.vertices[v_idx1 * 3], polygon.vertices[v_idx1 * 3 + 1], polygon.vertices[v_idx1 * 3 + 2]);
+  vec2 =
+      Eigen::Vector3d(polygon.vertices[v_idx2 * 3], polygon.vertices[v_idx2 * 3 + 1], polygon.vertices[v_idx2 * 3 + 2]);
+  vec3 =
+      Eigen::Vector3d(polygon.vertices[v_idx3 * 3], polygon.vertices[v_idx3 * 3 + 1], polygon.vertices[v_idx3 * 3 + 2]);
   vec2 -= vec1;
   vec3 -= vec1;
   normal = vec3.cross(vec2);
@@ -590,22 +592,22 @@ shapes::Mesh* SemanticWorld::createSolidMeshFromPlanarPolygon(const shapes::Mesh
   // copy the first set of triangles
   memcpy(solid->triangles, polygon.triangles, polygon.triangle_count * 3 * sizeof(unsigned int));
 
-  for (unsigned tIdx = 0; tIdx < polygon.triangle_count; ++tIdx)
+  for (unsigned t_idx = 0; t_idx < polygon.triangle_count; ++t_idx)
   {
-    solid->triangles[(tIdx + polygon.triangle_count) * 3 + 0] = solid->triangles[tIdx * 3 + 0] + polygon.vertex_count;
-    solid->triangles[(tIdx + polygon.triangle_count) * 3 + 1] = solid->triangles[tIdx * 3 + 1] + polygon.vertex_count;
-    solid->triangles[(tIdx + polygon.triangle_count) * 3 + 2] = solid->triangles[tIdx * 3 + 2] + polygon.vertex_count;
+    solid->triangles[(t_idx + polygon.triangle_count) * 3 + 0] = solid->triangles[t_idx * 3 + 0] + polygon.vertex_count;
+    solid->triangles[(t_idx + polygon.triangle_count) * 3 + 1] = solid->triangles[t_idx * 3 + 1] + polygon.vertex_count;
+    solid->triangles[(t_idx + polygon.triangle_count) * 3 + 2] = solid->triangles[t_idx * 3 + 2] + polygon.vertex_count;
 
-    int vIdx1 = polygon.triangles[tIdx * 3];
-    int vIdx2 = polygon.triangles[tIdx * 3 + 1];
-    int vIdx3 = polygon.triangles[tIdx * 3 + 2];
+    int v_idx1 = polygon.triangles[t_idx * 3];
+    int v_idx2 = polygon.triangles[t_idx * 3 + 1];
+    int v_idx3 = polygon.triangles[t_idx * 3 + 2];
 
-    vec1 =
-        Eigen::Vector3d(polygon.vertices[vIdx1 * 3], polygon.vertices[vIdx1 * 3 + 1], polygon.vertices[vIdx1 * 3 + 2]);
-    vec2 =
-        Eigen::Vector3d(polygon.vertices[vIdx2 * 3], polygon.vertices[vIdx2 * 3 + 1], polygon.vertices[vIdx2 * 3 + 2]);
-    vec3 =
-        Eigen::Vector3d(polygon.vertices[vIdx3 * 3], polygon.vertices[vIdx3 * 3 + 1], polygon.vertices[vIdx3 * 3 + 2]);
+    vec1 = Eigen::Vector3d(polygon.vertices[v_idx1 * 3], polygon.vertices[v_idx1 * 3 + 1],
+                           polygon.vertices[v_idx1 * 3 + 2]);
+    vec2 = Eigen::Vector3d(polygon.vertices[v_idx2 * 3], polygon.vertices[v_idx2 * 3 + 1],
+                           polygon.vertices[v_idx2 * 3 + 2]);
+    vec3 = Eigen::Vector3d(polygon.vertices[v_idx3 * 3], polygon.vertices[v_idx3 * 3 + 1],
+                           polygon.vertices[v_idx3 * 3 + 2]);
 
     vec2 -= vec1;
     vec3 -= vec1;
@@ -613,20 +615,20 @@ shapes::Mesh* SemanticWorld::createSolidMeshFromPlanarPolygon(const shapes::Mesh
     Eigen::Vector3d triangle_normal = vec2.cross(vec1);
 
     if (triangle_normal.dot(normal) < 0.0)
-      std::swap(solid->triangles[tIdx * 3 + 1], solid->triangles[tIdx * 3 + 2]);
+      std::swap(solid->triangles[t_idx * 3 + 1], solid->triangles[t_idx * 3 + 2]);
     else
-      std::swap(solid->triangles[(tIdx + polygon.triangle_count) * 3 + 1],
-                solid->triangles[(tIdx + polygon.triangle_count) * 3 + 2]);
+      std::swap(solid->triangles[(t_idx + polygon.triangle_count) * 3 + 1],
+                solid->triangles[(t_idx + polygon.triangle_count) * 3 + 2]);
   }
 
-  for (unsigned vIdx = 0; vIdx < polygon.vertex_count; ++vIdx)
+  for (unsigned v_idx = 0; v_idx < polygon.vertex_count; ++v_idx)
   {
-    solid->vertices[(vIdx + polygon.vertex_count) * 3 + 0] = solid->vertices[vIdx * 3 + 0] - thickness * normal[0];
-    solid->vertices[(vIdx + polygon.vertex_count) * 3 + 1] = solid->vertices[vIdx * 3 + 1] - thickness * normal[1];
-    solid->vertices[(vIdx + polygon.vertex_count) * 3 + 2] = solid->vertices[vIdx * 3 + 2] - thickness * normal[2];
+    solid->vertices[(v_idx + polygon.vertex_count) * 3 + 0] = solid->vertices[v_idx * 3 + 0] - thickness * normal[0];
+    solid->vertices[(v_idx + polygon.vertex_count) * 3 + 1] = solid->vertices[v_idx * 3 + 1] - thickness * normal[1];
+    solid->vertices[(v_idx + polygon.vertex_count) * 3 + 2] = solid->vertices[v_idx * 3 + 2] - thickness * normal[2];
   }
 
   return solid;
 }
-}
-}
+}  // namespace semantic_world
+}  // namespace moveit
